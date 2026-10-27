@@ -4,7 +4,8 @@ import { isOwner, supabaseConfig } from "@/lib/env";
 
 // Rutas que se pueden abrir sin sesión. Todo lo demás exige ser el propietario.
 // Lista cerrada: /auth/google/* (conexión con Calendar) exige sesión del propietario.
-const PUBLIC_PATHS = ["/login", "/offline.html", "/auth/login", "/auth/callback", "/auth/signout"];
+// /privacidad es pública a propósito: Google exige una política de privacidad accesible para publicar la app.
+const PUBLIC_PATHS = ["/login", "/offline.html", "/privacidad", "/auth/login", "/auth/callback", "/auth/signout"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.includes(pathname);
