@@ -3,11 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isOwner, supabaseConfig } from "@/lib/env";
 
 // Rutas que se pueden abrir sin sesión. Todo lo demás exige ser el propietario.
-const PUBLIC_PATHS = ["/login", "/offline.html"];
-const PUBLIC_PREFIXES = ["/auth/"];
+// Lista cerrada: /auth/google/* (conexión con Calendar) exige sesión del propietario.
+const PUBLIC_PATHS = ["/login", "/offline.html", "/auth/login", "/auth/callback", "/auth/signout"];
 
 function isPublic(pathname: string) {
-  return PUBLIC_PATHS.includes(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  return PUBLIC_PATHS.includes(pathname);
 }
 
 function buildCsp(nonce: string) {

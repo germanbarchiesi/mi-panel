@@ -14,6 +14,13 @@ export function supabaseConfig() {
   };
 }
 
+export function googleConfig() {
+  return {
+    clientId: required("GOOGLE_CLIENT_ID", process.env.GOOGLE_CLIENT_ID).trim(),
+    clientSecret: required("GOOGLE_CLIENT_SECRET", process.env.GOOGLE_CLIENT_SECRET).trim(),
+  };
+}
+
 export function allowedEmail(): string {
   return required("ALLOWED_EMAIL", process.env.ALLOWED_EMAIL).trim().toLowerCase();
 }
