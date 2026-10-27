@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Secretos: nunca al repositorio
+.env
+.env.*
+!.env.example
+
+.vercel/
+.DS_Store
+npm-debug.log*
