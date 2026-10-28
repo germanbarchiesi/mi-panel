@@ -36,3 +36,11 @@ export function isOwner(user: {
   if (user.user_metadata?.email_verified === false) return false;
   return user.email.trim().toLowerCase() === allowedEmail();
 }
+
+/** Selector de Google (Picker): clave de API restringida y número del proyecto de Google Cloud. */
+export function pickerConfig(): { apiKey: string; appId: string } | null {
+  const apiKey = process.env.GOOGLE_PICKER_API_KEY?.trim();
+  const appId = process.env.GOOGLE_PROJECT_NUMBER?.trim();
+  if (!apiKey || !appId || !/^\d{6,20}$/.test(appId)) return null;
+  return { apiKey, appId };
+}

@@ -11,16 +11,25 @@ function isPublic(pathname: string) {
   return PUBLIC_PATHS.includes(pathname);
 }
 
-function buildCsp(nonce: string) {
+// El selector de Google (para elegir el Excel) solo se usa en Ajustes: solo ahí se permiten sus marcos.
+const GOOGLE_PICKER = {
+  frame: "https://docs.google.com https://drive.google.com https://accounts.google.com https://content.googleapis.com",
+  img: "https://*.gstatic.com https://*.googleusercontent.com https://drive-thirdparty.googleusercontent.com",
+  connect: "https://apis.google.com https://content.googleapis.com https://www.googleapis.com",
+};
+
+function buildCsp(nonce: string, pathname = "/") {
   const dev = process.env.NODE_ENV !== "production";
+  const picker = pathname === "/ajustes";
   return [
     "default-src 'self'",
     // 'strict-dynamic' + nonce: solo corre el JS que Next carga con nonce. Sin scripts de terceros.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    `img-src 'self' data:${picker ? ` ${GOOGLE_PICKER.img}` : ""}`,
     "font-src 'self'",
-    "connect-src 'self'" + (dev ? " ws: wss:" : ""),
+    "connect-src 'self'" + (picker ? ` ${GOOGLE_PICKER.connect}` : "") + (dev ? " ws: wss:" : ""),
+    picker ? `frame-src ${GOOGLE_PICKER.frame}` : "frame-src 'none'",
     "manifest-src 'self'",
     "worker-src 'self'",
     "object-src 'none'",
@@ -33,7 +42,7 @@ function buildCsp(nonce: string) {
 
 export async function proxy(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
-  const csp = buildCsp(nonce);
+  const csp = buildCsp(nonce, request.nextUrl.pathname);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);

@@ -3,6 +3,12 @@ import { googleConfig } from "@/lib/env";
 import { descifrar } from "@/lib/cripto";
 
 export const SCOPE_CALENDAR = "https://www.googleapis.com/auth/calendar.readonly";
+/** Drive limitado a los ficheros que el usuario elige con el selector de Google (nunca todo Drive). */
+export const SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
+
+export function tieneScope(scopes: string, scope: string): boolean {
+  return scopes.split(/\s+/).includes(scope);
+}
 
 /** El usuario no ha conectado Google, o Google revocó/caducó el permiso. */
 export class GoogleReconectar extends Error {
@@ -15,6 +21,12 @@ export class GoogleReconectar extends Error {
 export class FaltaMigracion extends Error {}
 
 const cache = new Map<string, { token: string; caduca: number }>();
+
+/** Permisos concedidos en la conexión guardada ("" si no hay conexión). */
+export async function scopesConcedidos(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data } = await supabase.from("conexiones_google").select("scopes").eq("user_id", userId).maybeSingle();
+  return data?.scopes ?? "";
+}
 
 export async function accessToken(supabase: SupabaseClient, userId: string): Promise<string> {
   const hit = cache.get(userId);

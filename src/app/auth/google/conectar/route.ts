@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { googleConfig, isOwner } from "@/lib/env";
-import { SCOPE_CALENDAR } from "@/lib/google";
+import { SCOPE_CALENDAR, SCOPE_DRIVE_FILE } from "@/lib/google";
 
-// Inicia la conexión con Google Calendar (permiso de solo lectura), con PKCE y "state".
-// Es aparte del login: el login solo pide identidad; este permiso se pide cuando hace falta.
+// Inicia la conexión con Google (Calendar de solo lectura y Drive limitado a los ficheros que elijas),
+// con PKCE y "state". Es aparte del login: el login solo pide identidad.
 export async function GET(request: Request) {
   const { origin } = new URL(request.url);
 
@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     client_id: googleConfig().clientId,
     redirect_uri: `${origin}/auth/google/callback`,
     response_type: "code",
-    scope: SCOPE_CALENDAR,
+    scope: `${SCOPE_CALENDAR} ${SCOPE_DRIVE_FILE}`,
+    include_granted_scopes: "true",
     access_type: "offline", // para recibir refresh token
     prompt: "consent", // fuerza que Google lo entregue siempre
     state,

@@ -33,11 +33,26 @@ export async function cargarAjustes(supabase: SupabaseClient, userId: string): P
 export async function cargarAjustesYEstado(
   supabase: SupabaseClient,
   userId: string,
-): Promise<{ ajustes: Ajustes; misTareasUltimoOk: number | null }> {
+): Promise<{ ajustes: Ajustes; misTareasUltimoOk: number | null; excel: FicheroElegido | null }> {
   const { data } = await supabase.from("ajustes").select("datos").eq("user_id", userId).maybeSingle();
   const raw = (data?.datos ?? {}) as Record<string, unknown>;
   const t = typeof raw.misTareasUltimoOk === "string" ? Date.parse(raw.misTareasUltimoOk) : NaN;
-  return { ajustes: normalizarAjustes(raw), misTareasUltimoOk: Number.isFinite(t) ? t : null };
+  return { ajustes: normalizarAjustes(raw), misTareasUltimoOk: Number.isFinite(t) ? t : null, excel: ficheroElegido(raw.excel) };
+}
+
+/** Excel de cuentas elegido con el selector de Google: solo su id y su nombre. */
+export type FicheroElegido = { id: string; nombre: string };
+
+function ficheroElegido(v: unknown): FicheroElegido | null {
+  const o = (v ?? {}) as Record<string, unknown>;
+  return typeof o.id === "string" && /^[A-Za-z0-9_-]{10,200}$/.test(o.id) && typeof o.nombre === "string"
+    ? { id: o.id, nombre: o.nombre.slice(0, 200) }
+    : null;
+}
+
+export async function guardarExcel(supabase: SupabaseClient, userId: string, excel: FicheroElegido | null) {
+  const datos = { ...(await leerDatos(supabase, userId)), excel };
+  return supabase.from("ajustes").upsert({ user_id: userId, datos, actualizado: new Date().toISOString() });
 }
 
 async function leerDatos(supabase: SupabaseClient, userId: string): Promise<Record<string, unknown>> {
