@@ -5,6 +5,7 @@ import {
   addDays,
   construirDia,
   formatDuracion,
+  tramoDelDia,
   weekday,
   ymdInTz,
   zonedToUtc,
@@ -132,4 +133,62 @@ test("cifrado AES-256-GCM: ida y vuelta, y ligado al usuario", () => {
   assert.throws(() => descifrar(c, "usuario-2")); // otro dueño: no descifra
   const roto = c.slice(0, -2) + (c.endsWith("AA") ? "BB" : "AA");
   assert.throws(() => descifrar(roto, "usuario-1")); // manipulado: no descifra
+});
+
+// «Segundo pago a Esquiades»: del 26 oct 22:00 al 5 nov 00:00 (evento real que motivó el cambio).
+const esquiades = (): Evento => ({
+  clave: "esquiades",
+  titulo: "Segundo pago a Esquiades",
+  calendario: "Mi calendario",
+  todoElDia: false,
+  libre: false,
+  inicio: zonedToUtc("2026-10-26", "22:00", TZ),
+  fin: zonedToUtc("2026-11-05", "00:00", TZ),
+});
+
+test("varios días como contexto: no ocupa huecos ni solapa", () => {
+  const antes = zonedToUtc("2026-10-28", "08:00", TZ);
+  const cena = ev("Cena", "2026-10-28", "20:00", "21:00");
+  const dia = construirDia("2026-10-28", [esquiades(), cena], AJUSTES_POR_DEFECTO, TZ, antes);
+  assert.equal(dia.variosDias.length, 1);
+  assert.deepEqual(dia.eventos.map((e) => e.titulo), ["Cena"]);
+  assert.equal(dia.solapes.length, 0);
+  assert.equal(dia.huecos.length, 2); // 17:00–20:00 y 21:00–22:30
+});
+
+test("varios días sin la opción: ocupa, recortado al día", () => {
+  const antes = zonedToUtc("2026-10-28", "08:00", TZ);
+  const ajustes = { ...AJUSTES_POR_DEFECTO, variosDiasComoContexto: false };
+  const dia = construirDia("2026-10-28", [esquiades(), ev("Cena", "2026-10-28", "20:00", "21:00")], ajustes, TZ, antes);
+  assert.equal(dia.variosDias.length, 0);
+  assert.equal(dia.eventos.length, 2);
+  assert.equal(dia.huecos.length, 0);
+  assert.equal(dia.solapes.length, 1);
+});
+
+test("tramoDelDia recorta: desde, todo el día, hasta y normal", () => {
+  const e = esquiades();
+  const tramo = (ymd: string) => {
+    const ini = zonedToUtc(ymd, "00:00", TZ);
+    const fin = zonedToUtc(addDays(ymd, 1), "00:00", TZ);
+    return tramoDelDia(e, ini, fin, TZ);
+  };
+  assert.equal(tramo("2026-10-26"), "desde 22:00");
+  assert.equal(tramo("2026-10-30"), "Todo el día");
+  assert.equal(tramo("2026-11-04"), "Todo el día");
+  const corto = ev("Turno", "2026-10-28", "23:00", "23:30");
+  corto.fin = zonedToUtc("2026-10-29", "01:00", TZ);
+  const d29 = zonedToUtc("2026-10-29", "00:00", TZ);
+  assert.equal(tramoDelDia(corto, d29, zonedToUtc("2026-10-30", "00:00", TZ), TZ), "hasta 01:00");
+  const normal = ev("Cena", "2026-10-28", "20:00", "21:00");
+  assert.equal(tramoDelDia(normal, 0, Infinity, TZ), "20:00–21:00");
+});
+
+test("un evento nocturno corto (menos de 24 h) sigue ocupando", () => {
+  const corto = ev("Viaje nocturno", "2026-10-28", "21:00", "22:00");
+  corto.fin = zonedToUtc("2026-10-29", "02:00", TZ);
+  const antes = zonedToUtc("2026-10-28", "08:00", TZ);
+  const dia = construirDia("2026-10-28", [corto], AJUSTES_POR_DEFECTO, TZ, antes);
+  assert.equal(dia.variosDias.length, 0);
+  assert.equal(dia.eventos.length, 1);
 });

@@ -42,6 +42,7 @@ async function guardar(formData: FormData) {
     fs: { ini: String(formData.get("fs_ini")), fin: String(formData.get("fs_fin")) },
     minHueco: Number(formData.get("min_hueco")),
     horaLocal: formData.get("hora_local") === "on",
+    variosDiasComoContexto: formData.get("varios_dias") === "on",
   });
   const { error } = await guardarAjustes(supabase, user.id, nuevos);
   revalidatePath("/");
@@ -218,6 +219,14 @@ export default async function AjustesPage({
               <input type="number" name="min_hueco" min={15} max={240} step={5} defaultValue={ajustes.minHueco} required />
             </label>
           </div>
+          <label className="check">
+            <input type="checkbox" name="varios_dias" defaultChecked={ajustes.variosDiasComoContexto} />
+            Eventos de varios días como contexto
+          </label>
+          <p className="muted small">
+            Los eventos con hora de 24 h o más (p. ej. un recordatorio que dura una semana) se muestran arriba con la
+            etiqueta «varios días» y no quitan huecos ni cuentan como solape.
+          </p>
         </div>
 
         <div className="card">

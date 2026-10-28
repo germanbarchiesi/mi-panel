@@ -21,6 +21,7 @@ export function normalizarAjustes(datos: unknown): Ajustes {
     fs: ventana(d.fs, AJUSTES_POR_DEFECTO.fs),
     minHueco: Number.isFinite(min) && min >= 15 && min <= 240 ? Math.round(min) : AJUSTES_POR_DEFECTO.minHueco,
     horaLocal: d.horaLocal === true,
+    variosDiasComoContexto: d.variosDiasComoContexto !== false, // por defecto, sí
   };
 }
 

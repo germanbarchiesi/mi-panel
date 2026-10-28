@@ -12,6 +12,7 @@ export type Ajustes = {
   fs: Ventana; // ventana de huecos sábado y domingo
   minHueco: number; // minutos
   horaLocal: boolean; // usar la hora de donde estoy en vez de Barcelona
+  variosDiasComoContexto: boolean; // eventos con hora de 24 h o más: contexto, no ocupan ni solapan
 };
 
 export const AJUSTES_POR_DEFECTO: Ajustes = {
@@ -20,7 +21,15 @@ export const AJUSTES_POR_DEFECTO: Ajustes = {
   fs: { ini: "09:00", fin: "22:30" },
   minHueco: 45,
   horaLocal: false,
+  variosDiasComoContexto: true,
 };
+
+/** Un evento con hora que dura 24 h o más (p. ej. un recordatorio de 26 oct 22:00 a 5 nov). */
+export const VARIOS_DIAS_MS = 24 * 3600 * 1000;
+
+export function esVariosDias(e: Evento): boolean {
+  return !e.todoElDia && e.inicio !== undefined && e.fin !== undefined && e.fin - e.inicio >= VARIOS_DIAS_MS;
+}
 
 export type Evento = {
   clave: string; // para quitar duplicados entre calendarios
@@ -42,8 +51,11 @@ export type Hueco = { ini: number; fin: number };
 export type Dia = {
   fecha: string; // YYYY-MM-DD en la zona elegida
   esHoy: boolean;
+  ini: number; // 00:00 del día (ms UTC)
+  fin: number; // 00:00 del día siguiente
   todoElDia: Evento[];
-  eventos: Evento[]; // con hora, ordenados
+  variosDias: Evento[]; // de varios días tratados como contexto: no ocupan ni solapan
+  eventos: Evento[]; // con hora, ordenados (recortados al día al mostrarlos)
   huecos: Hueco[];
   solapes: [Evento, Evento][];
 };
@@ -158,12 +170,14 @@ export function construirDia(
   const todoElDia = eventos.filter(
     (e) => e.todoElDia && e.diaIni !== undefined && e.diaFin !== undefined && e.diaIni <= ymd && ymd < e.diaFin,
   );
-  const conHora = eventos
+  const delDia = eventos
     .filter(
       (e) =>
         !e.todoElDia && e.inicio !== undefined && e.fin !== undefined && e.inicio < diaFin && e.fin > diaIni,
     )
     .sort((a, b) => (a.inicio ?? 0) - (b.inicio ?? 0));
+  const variosDias = ajustes.variosDiasComoContexto ? delDia.filter(esVariosDias) : [];
+  const conHora = ajustes.variosDiasComoContexto ? delDia.filter((e) => !esVariosDias(e)) : delDia;
 
   // Huecos: dentro de la ventana del día, fuera de lo que ocupan los eventos no "libres".
   const dow = weekday(ymd);
@@ -200,5 +214,15 @@ export function construirDia(
     }
   }
 
-  return { fecha: ymd, esHoy, todoElDia, eventos: conHora, huecos, solapes };
+  return { fecha: ymd, esHoy, ini: diaIni, fin: diaFin, todoElDia, variosDias, eventos: conHora, huecos, solapes };
+}
+
+/** Tramo de un evento con hora dentro de un día: recortado si empieza antes o acaba después. */
+export function tramoDelDia(e: Evento, diaIni: number, diaFin: number, tz: string): string {
+  const ini = e.inicio as number;
+  const fin = e.fin as number;
+  if (ini <= diaIni && fin >= diaFin) return "Todo el día";
+  if (ini < diaIni) return `hasta ${formatHora(fin, tz)}`;
+  if (fin > diaFin) return `desde ${formatHora(ini, tz)}`;
+  return `${formatHora(ini, tz)}–${formatHora(fin, tz)}`;
 }
