@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 2 · Agenda** — sobre la base de la fase 1 (login con Google restringido a una cuenta, PWA instalable y cabeceras de seguridad), la Agenda con Google Calendar.
+**Estado: Fase 3 · Actividades** — sobre la base (fase 1) y la Agenda con Google Calendar (fase 2), el módulo Actividades con la API v1 de Mis tareas.
 
 ## Qué incluye la fase 1
 
@@ -20,6 +20,17 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 - Los eventos no se guardan: se leen de Google al abrir. Eventos marcados como «disponible» o rechazados no ocupan; el mismo evento en dos calendarios cuenta una vez.
 - `npm test` ejecuta las pruebas de la lógica de agenda (zonas horarias, cambio de hora, huecos, solapes) y del cifrado.
 
+## Fase 3 · Actividades
+
+- **Fuente:** API v1 de solo lectura de Mis tareas (`/api/v1/resumen` y `/api/v1/ocupado`). Solo se llama desde el servidor (`src/lib/mis-tareas-api.ts`, con `server-only`); la clave nunca llega al navegador.
+- **Sin copia de datos:** caché en memoria del servidor de 60 s como máximo, peticiones con `no-store` y sin seguir redirecciones. En la base de datos solo se guarda la hora de la última respuesta correcta (en `ajustes.datos`, como mucho cada 5 min).
+- **Fecha:** se envía el «hoy» de Mi Panel en su zona horaria (Barcelona o la del dispositivo).
+- **Módulo:** Hoy, Arrastradas («↻ N días») y Temas por persona; selector Trabajo / Personal / Todo (en «Todo», dos marcos); prioridad como punto rojo, amarillo o verde; «Nada pendiente para hoy»; enlace «Abrir Mis tareas».
+- **Equipo de trabajo:** en Ajustes → «Este equipo», «Es el PC de Appliant» guarda una cookie en ese dispositivo y Actividades abre en Trabajo (solo pide ese ámbito). El modo trabajo completo es la fase 10.
+- **Agenda:** las tareas con hora de `/api/v1/ocupado` (hoy + 7 días) ocupan huecos y cuentan para solapes. El calendario de Google «Mis tareas» no se lee nunca.
+- **Errores:** 401, 400, 429 (respeta `Retry-After`), 5xx, red o formato raro → el módulo lo indica con la hora de la última respuesta correcta; el resto del panel sigue igual.
+- **Resumen de las 7:00:** `textoResumen()` en `src/lib/mis-tareas.ts` genera el párrafo de tareas; se conectará cuando exista el resumen (fase 9).
+
 ## Variables de entorno
 
 Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el código ni en el chat.
@@ -32,6 +43,8 @@ Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el c�
 | `GOOGLE_CLIENT_ID` | Cliente OAuth de Google Cloud (fase 2) |
 | `GOOGLE_CLIENT_SECRET` | Secreto del cliente OAuth (fase 2) |
 | `TOKEN_ENCRYPTION_KEY` | 32 bytes aleatorios en base64; cifra el permiso de Google (fase 2) |
+| `MIS_TAREAS_API_URL` | Dirección de Mis tareas, p. ej. `https://mis-tareas-peach.vercel.app` (fase 3) |
+| `MIS_TAREAS_API_KEY` | Clave de solo lectura de Mis tareas (`mt_` + 64 hex) (fase 3) |
 
 ## Puesta en marcha (una vez)
 
@@ -56,7 +69,7 @@ cp .env.example .env.local   # rellenar
 npm run dev
 ```
 
-`npm run typecheck` y `npm run lint` deben pasar antes de cada commit.
+`npm test`, `npm run typecheck` y `npm run lint` deben pasar antes de cada commit.
 
 ## Estructura
 
@@ -66,6 +79,10 @@ src/lib/agenda.ts          lógica pura: zonas horarias, huecos, solapes (con te
 src/lib/cripto.ts          cifrado AES-256-GCM del permiso de Google
 src/lib/google.ts          access token a partir del refresh token cifrado
 src/lib/calendar.ts        lectura de calendarios y eventos (solo lectura)
+src/lib/mis-tareas.ts      validación de la API v1, marcos, tareas para la Agenda, texto del resumen (con tests)
+src/lib/mis-tareas-api.ts  llamadas a Mis tareas (solo servidor, caché 60 s, errores)
+src/lib/equipo.ts          marca de «PC de Appliant» por dispositivo
+src/components/actividades.tsx  módulo Actividades
 src/app/auth/google/*      conectar, callback y desconectar de Calendar
 src/app/ajustes            página de ajustes
 src/lib/env.ts             variables de entorno y comprobación del propietario

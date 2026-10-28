@@ -51,6 +51,11 @@ export function excluidoPorDefecto(nombre: string): boolean {
   return /^(mis tareas|deporte)$/i.test(nombre.trim());
 }
 
+/** El calendario «Mis tareas» no se lee nunca: sus tareas llegan por /api/v1/ocupado y contarían dos veces. */
+export function esCalendarioMisTareas(nombre: string): boolean {
+  return /^mis tareas$/i.test(nombre.trim());
+}
+
 type GEvento = {
   id: string;
   iCalUID?: string;

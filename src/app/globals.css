@@ -256,3 +256,135 @@ input[type="number"] {
   background: var(--bg);
   color: var(--text);
 }
+
+/* --- Fase 3 · Actividades --- */
+:root {
+  --prio-alta: #e5484d;
+  --prio-media: #f5b301;
+  --prio-baja: #30a46c;
+  --tarea: #8e4ec6;
+}
+
+.row-compacta {
+  margin-bottom: 8px;
+}
+
+.row-compacta h2 {
+  margin: 0;
+}
+
+.enlace {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.selector {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.seg {
+  flex: 1;
+  text-align: center;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.seg.activo {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.marco {
+  padding-top: 8px;
+}
+
+.marco + .marco {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.marco h3 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+
+.etiqueta {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prio-alta {
+  background: var(--prio-alta);
+}
+
+.prio-media {
+  background: var(--prio-media);
+}
+
+.prio-baja {
+  background: var(--prio-baja);
+}
+
+.dot-vacio {
+  border: 1px solid var(--border);
+}
+
+.dot-mini {
+  width: 8px;
+  height: 8px;
+  vertical-align: middle;
+}
+
+.ev .dot-vacio,
+.ev .prio-alta,
+.ev .prio-media,
+.ev .prio-baja {
+  align-self: center;
+}
+
+.arrastre {
+  color: var(--danger);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.persona {
+  padding: 6px 0;
+}
+
+.temas {
+  margin: 2px 0 0;
+  padding-left: 20px;
+}
+
+.dot-tarea {
+  background: transparent;
+  border: 2px solid var(--tarea);
+  align-self: center;
+}
+
+.ev-tarea .ev-titulo {
+  font-style: italic;
+}

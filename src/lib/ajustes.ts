@@ -25,12 +25,48 @@ export function normalizarAjustes(datos: unknown): Ajustes {
 }
 
 export async function cargarAjustes(supabase: SupabaseClient, userId: string): Promise<Ajustes> {
+  return (await cargarAjustesYEstado(supabase, userId)).ajustes;
+}
+
+/** Ajustes y hora de la última respuesta correcta de Mis tareas (no se guarda ninguna tarea). */
+export async function cargarAjustesYEstado(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ ajustes: Ajustes; misTareasUltimoOk: number | null }> {
   const { data } = await supabase.from("ajustes").select("datos").eq("user_id", userId).maybeSingle();
-  return normalizarAjustes(data?.datos);
+  const raw = (data?.datos ?? {}) as Record<string, unknown>;
+  const t = typeof raw.misTareasUltimoOk === "string" ? Date.parse(raw.misTareasUltimoOk) : NaN;
+  return { ajustes: normalizarAjustes(raw), misTareasUltimoOk: Number.isFinite(t) ? t : null };
+}
+
+async function leerDatos(supabase: SupabaseClient, userId: string): Promise<Record<string, unknown>> {
+  const { data } = await supabase.from("ajustes").select("datos").eq("user_id", userId).maybeSingle();
+  return (data?.datos ?? {}) as Record<string, unknown>;
 }
 
 export async function guardarAjustes(supabase: SupabaseClient, userId: string, ajustes: Ajustes) {
-  return supabase
-    .from("ajustes")
-    .upsert({ user_id: userId, datos: ajustes, actualizado: new Date().toISOString() });
+  // Se conservan los demás campos guardados (p. ej. misTareasUltimoOk).
+  const datos = { ...(await leerDatos(supabase, userId)), ...ajustes };
+  return supabase.from("ajustes").upsert({ user_id: userId, datos, actualizado: new Date().toISOString() });
+}
+
+const CADA = 5 * 60_000;
+
+/**
+ * Anota la hora de la última respuesta correcta de Mis tareas. Para no escribir en cada carga,
+ * solo si la anterior tiene más de 5 minutos. Fallar aquí no debe romper el panel.
+ */
+export async function registrarOkMisTareas(
+  supabase: SupabaseClient,
+  userId: string,
+  anterior: number | null,
+  ahora: number,
+) {
+  if (anterior !== null && ahora - anterior < CADA) return;
+  try {
+    const datos = { ...(await leerDatos(supabase, userId)), misTareasUltimoOk: new Date(ahora).toISOString() };
+    await supabase.from("ajustes").upsert({ user_id: userId, datos, actualizado: new Date().toISOString() });
+  } catch {
+    // Sin consecuencias: solo se pierde la hora mostrada en Ajustes.
+  }
 }

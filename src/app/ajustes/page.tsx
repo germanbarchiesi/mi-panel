@@ -4,10 +4,15 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isOwner } from "@/lib/env";
-import { cargarAjustes, guardarAjustes, normalizarAjustes } from "@/lib/ajustes";
+import { cargarAjustes, cargarAjustesYEstado, guardarAjustes, normalizarAjustes, registrarOkMisTareas } from "@/lib/ajustes";
 import { accessToken, FaltaMigracion, GoogleReconectar } from "@/lib/google";
 import { listarCalendarios, excluidoPorDefecto, type CalendarioInfo } from "@/lib/calendar";
-import { calendariosActivos, zonaHoraria } from "@/lib/agenda-loader";
+import { calendariosActivos, hoyEn, zonaHoraria } from "@/lib/agenda-loader";
+import { formatHora } from "@/lib/agenda";
+import { esCalendarioMisTareas } from "@/lib/calendar";
+import { MENSAJES_FALLO } from "@/lib/mis-tareas";
+import { pedirResumen, urlMisTareas } from "@/lib/mis-tareas-api";
+import { esEquipoTrabajo, marcarEquipoTrabajo } from "@/lib/equipo";
 import { TzSync } from "@/components/tz-sync";
 
 export const metadata: Metadata = { title: "Ajustes" };
@@ -43,6 +48,23 @@ async function guardar(formData: FormData) {
   redirect(error ? "/ajustes?error=guardar" : "/ajustes?ok=guardado");
 }
 
+async function guardarEquipo(formData: FormData) {
+  "use server";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isOwner(user)) redirect("/login");
+  await marcarEquipoTrabajo(formData.get("equipo_trabajo") === "on");
+  revalidatePath("/");
+  redirect("/ajustes?ok=equipo");
+}
+
+function fechaHora(ms: number, tz: string): string {
+  const dia = new Intl.DateTimeFormat("es-ES", { timeZone: tz, day: "numeric", month: "short" }).format(new Date(ms));
+  return `${dia}, ${formatHora(ms, tz)}`;
+}
+
 export default async function AjustesPage({
   searchParams,
 }: {
@@ -55,8 +77,18 @@ export default async function AjustesPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const ajustes = await cargarAjustes(supabase, user.id);
+  const { ajustes, misTareasUltimoOk } = await cargarAjustesYEstado(supabase, user.id);
   const tz = await zonaHoraria(ajustes);
+  const equipoTrabajo = await esEquipoTrabajo();
+
+  // Estado de Mis tareas: una llamada real (con la caché de 60 s). En el PC de Appliant solo se pide Trabajo.
+  const mt = await pedirResumen(hoyEn(tz), equipoTrabajo ? "trabajo" : undefined).catch(() => null);
+  let ultimoOk = misTareasUltimoOk;
+  if (mt?.ok) {
+    await registrarOkMisTareas(supabase, user.id, misTareasUltimoOk, mt.obtenido);
+    ultimoOk = Math.max(ultimoOk ?? 0, mt.obtenido);
+  }
+  const appMisTareas = urlMisTareas();
 
   let calendarios: CalendarioInfo[] = [];
   let conectado = false;
@@ -85,6 +117,7 @@ export default async function AjustesPage({
 
       {ok === "guardado" && <p role="status">Ajustes guardados.</p>}
       {ok === "desconectado" && <p role="status">Google Calendar desconectado.</p>}
+      {ok === "equipo" && <p role="status">Equipo actualizado.</p>}
       {error && (
         <p className="error" role="alert">
           {ERRORES[error] ?? "Ha ocurrido un error."}
@@ -110,12 +143,43 @@ export default async function AjustesPage({
         </div>
       </div>
 
+      <div className="card">
+        <h2>Mis tareas</h2>
+        <p className={mt?.ok ? "muted" : "error"}>
+          {mt?.ok ? "Conectada (solo lectura)." : mt ? MENSAJES_FALLO[mt.fallo] : MENSAJES_FALLO.respuesta}
+        </p>
+        <p className="muted small">
+          Última respuesta correcta: {ultimoOk ? fechaHora(ultimoOk, tz) : "ninguna todavía"}.
+          {" "}La clave solo está en Vercel; Mi Panel no guarda tus tareas.
+        </p>
+        {appMisTareas && (
+          <a className="btn" href={appMisTareas} target="_blank" rel="noopener noreferrer">
+            Abrir Mis tareas
+          </a>
+        )}
+      </div>
+
+      <form action={guardarEquipo} className="card">
+        <h2>Este equipo</h2>
+        <label className="check">
+          <input type="checkbox" name="equipo_trabajo" defaultChecked={equipoTrabajo} />
+          Es el PC de Appliant
+        </label>
+        <p className="muted small">
+          Solo afecta a este dispositivo: Actividades abre en Trabajo y solo pide ese ámbito. El modo trabajo completo
+          llega en la fase 10.
+        </p>
+        <button className="btn" type="submit">
+          Guardar equipo
+        </button>
+      </form>
+
       <form action={guardar}>
         {conectado && (
           <div className="card">
             <h2>Calendarios a mostrar</h2>
             <input type="hidden" name="cal_lista" value="1" />
-            {calendarios.map((c) => (
+            {calendarios.filter((c) => !esCalendarioMisTareas(c.nombre)).map((c) => (
               <label className="check" key={c.id}>
                 <input type="checkbox" name="cal" value={c.id} defaultChecked={activos.has(c.id)} />
                 <span className="dot" style={{ background: c.color ?? "var(--muted)" }} aria-hidden="true" />
@@ -123,7 +187,9 @@ export default async function AjustesPage({
                 {excluidoPorDefecto(c.nombre) && <span className="muted small"> · se lee por otra vía</span>}
               </label>
             ))}
-            <p className="muted small">«Mis tareas» y «Deporte» no se muestran por defecto para no contarlas dos veces.</p>
+            <p className="muted small">
+              «Mis tareas» no se lee nunca: sus tareas con hora llegan por su API. «Deporte» no se muestra por defecto.
+            </p>
           </div>
         )}
 

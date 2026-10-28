@@ -34,6 +34,7 @@ export type Evento = {
   diaIni?: string; // YYYY-MM-DD (todo el día)
   diaFin?: string; // exclusivo
   lugar?: string;
+  tarea?: boolean; // viene de Mis tareas (/api/v1/ocupado), no de Google Calendar
 };
 
 export type Hueco = { ini: number; fin: number };

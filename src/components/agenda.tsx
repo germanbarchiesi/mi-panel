@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { formatDia, formatDuracion, formatHora, type Dia, type Evento } from "@/lib/agenda";
 import type { ResultadoAgenda } from "@/lib/agenda-loader";
+import { MENSAJES_FALLO } from "@/lib/mis-tareas";
 
 function Punto({ color }: { color?: string }) {
   return <span className="dot" style={{ background: color ?? "var(--muted)" }} aria-hidden="true" />;
@@ -8,13 +10,14 @@ function Punto({ color }: { color?: string }) {
 
 function FilaEvento({ e, tz }: { e: Evento; tz: string }) {
   return (
-    <li className="ev">
-      <Punto color={e.color} />
+    <li className={e.tarea ? "ev ev-tarea" : "ev"}>
+      {e.tarea ? <span className="dot dot-tarea" aria-hidden="true" /> : <Punto color={e.color} />}
       <span className="ev-hora">
         {formatHora(e.inicio as number, tz)}–{formatHora(e.fin as number, tz)}
       </span>
       <span className="ev-titulo">
         {e.titulo}
+        {e.tarea && <span className="muted"> · tarea</span>}
         {e.libre && <span className="muted"> · libre</span>}
         {e.lugar && <span className="muted"> · {e.lugar}</span>}
       </span>
@@ -105,7 +108,31 @@ function DiaProximo({ dia, tz }: { dia: Dia; tz: string }) {
   );
 }
 
-export function Agenda({ r }: { r: ResultadoAgenda }) {
+export function Agenda({ r, trasHoy }: { r: ResultadoAgenda; trasHoy?: ReactNode }) {
+  if (r.estado !== "ok") {
+    return (
+      <>
+        <AgendaSinDatos r={r} />
+        {trasHoy}
+      </>
+    );
+  }
+
+  const [hoy, ...resto] = r.dias;
+  return (
+    <section aria-label="Agenda">
+      <DiaHoy dia={hoy} tz={r.tz} />
+      {trasHoy}
+      <h2 className="sub">Próximos 7 días</h2>
+      {resto.map((d) => (
+        <DiaProximo dia={d} tz={r.tz} key={d.fecha} />
+      ))}
+      <AvisoTareas r={r} />
+    </section>
+  );
+}
+
+function AgendaSinDatos({ r }: { r: Exclude<ResultadoAgenda, { estado: "ok" }> }) {
   if (r.estado === "sin_conectar" || r.estado === "reconectar") {
     return (
       <div className="card">
@@ -141,17 +168,22 @@ export function Agenda({ r }: { r: ResultadoAgenda }) {
     );
   }
 
-  const [hoy, ...resto] = r.dias;
+  return null;
+}
+
+function AvisoTareas({ r }: { r: Extract<ResultadoAgenda, { estado: "ok" }> }) {
   return (
-    <section aria-label="Agenda">
-      <DiaHoy dia={hoy} tz={r.tz} />
-      <h2 className="sub">Próximos 7 días</h2>
-      {resto.map((d) => (
-        <DiaProximo dia={d} tz={r.tz} key={d.fecha} />
-      ))}
+    <>
+      {r.tareas !== "ok" && r.tareas !== "sin_configurar" && (
+        <p className="aviso small" role="status">
+          Las tareas con hora de Mis tareas no se han podido leer: {MENSAJES_FALLO[r.tareas]} Los huecos no las tienen
+          en cuenta.
+        </p>
+      )}
       <p className="muted small">
-        Calendarios: {r.calendarios.length ? r.calendarios.join(", ") : "ninguno seleccionado"} · Zona horaria: {r.tz}
+        Calendarios: {r.calendarios.length ? r.calendarios.join(", ") : "ninguno seleccionado"}
+        {r.tareas === "ok" && " + tareas con hora de Mis tareas"} · Zona horaria: {r.tz}
       </p>
-    </section>
+    </>
   );
 }
