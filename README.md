@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 3 · Actividades** — sobre la base (fase 1) y la Agenda con Google Calendar (fase 2), el módulo Actividades con la API v1 de Mis tareas.
+**Estado: Fase 4 · Finanzas** — base (fase 1), Agenda (fase 2), Actividades con Mis tareas (fase 3) y Finanzas desde el Excel de cuentas (fase 4).
 
 ## Qué incluye la fase 1
 
@@ -31,6 +31,23 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 - **Errores:** 401, 400, 429 (respeta `Retry-After`), 5xx, red o formato raro → el módulo lo indica con la hora de la última respuesta correcta; el resto del panel sigue igual.
 - **Resumen de las 7:00:** `textoResumen()` en `src/lib/mis-tareas.ts` genera el párrafo de tareas; se conectará cuando exista el resumen (fase 9).
 
+## Fase 4 · Finanzas
+
+- **Fuente:** el Excel de cuentas (V6) en Drive, elegido con el selector de Google. Permiso `drive.file`: Mi Panel solo puede leer ese fichero. El selector solo se carga en `/ajustes`, la única página cuya CSP permite sus marcos.
+- **Lectura:** `src/lib/xlsx.ts` abre el `.xlsm`, lee `tblMovimientos`, `tblCuentas` (solo «Último movimiento importado»), la hoja Categorías y `cfgAnio`. Solo valores guardados por Excel: las macros ni se descomprimen. Límites de tamaño contra ficheros manipulados.
+- **Sin copia:** los movimientos viven solo en la memoria del servidor; se vuelven a descargar si cambia la versión del fichero en Drive. En la base de datos solo se guarda el id y el nombre del Excel.
+- **Cálculos** (`src/lib/finanzas.ts`): mes según la columna «Mes»; ingresado, gastado (Gasto − Ajuste, sin Sueldo, Alquiler Habitación ni sin clasificar), ahorro, tasa, pendientes, meses cerrados, media de cerrados, ritmo de gasto (±10 / +20 puntos), cierre estimado, top 5 y mes anterior. Comprobado contra el Resumen anual de la V6: los 10 meses, al céntimo.
+- **Huella / Windows Hello** (WebAuthn, verificación de usuario obligatoria): sin la cookie de desbloqueo firmada (5 min) el servidor no lee el Excel. Para registrar un dispositivo hay que haber entrado con Google en los últimos 10 minutos. Solo se guarda la clave pública (`credenciales_biometria`, migración 0003).
+- **Ocultar importes:** cookie por dispositivo; con ella el servidor no envía las cifras.
+- **PC de trabajo:** con «Es el PC de Appliant», Finanzas no se carga.
+
+### Puesta en marcha de la fase 4
+
+1. **Supabase → SQL Editor:** ejecutar `supabase/migrations/0003_biometria.sql`.
+2. **Google Cloud → Credenciales:** crear una clave de API restringida a `https://<tu-app>.vercel.app/*` y a Google Picker API. **Google Auth Platform → Acceso a los datos:** añadir `.../auth/drive.file`.
+3. **Vercel:** `GOOGLE_PICKER_API_KEY` y `GOOGLE_PROJECT_NUMBER` (número del proyecto).
+4. **App → Ajustes:** «Reconectar Google» (acepta Drive), «Elegir Excel en Drive» y, tras volver a entrar, «Registrar huella» en cada dispositivo.
+
 ## Variables de entorno
 
 Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el código ni en el chat.
@@ -45,6 +62,8 @@ Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el c�
 | `TOKEN_ENCRYPTION_KEY` | 32 bytes aleatorios en base64; cifra el permiso de Google (fase 2) |
 | `MIS_TAREAS_API_URL` | Dirección de Mis tareas, p. ej. `https://mis-tareas-peach.vercel.app` (fase 3) |
 | `MIS_TAREAS_API_KEY` | Clave de solo lectura de Mis tareas (`mt_` + 64 hex) (fase 3) |
+| `GOOGLE_PICKER_API_KEY` | Clave de API del selector de Google, restringida (fase 4) |
+| `GOOGLE_PROJECT_NUMBER` | Número del proyecto de Google Cloud (fase 4) |
 
 ## Puesta en marcha (una vez)
 
@@ -82,6 +101,12 @@ src/lib/calendar.ts        lectura de calendarios y eventos (solo lectura)
 src/lib/mis-tareas.ts      validación de la API v1, marcos, tareas para la Agenda, texto del resumen (con tests)
 src/lib/mis-tareas-api.ts  llamadas a Mis tareas (solo servidor, caché 60 s, errores)
 src/lib/equipo.ts          marca de «PC de Appliant» por dispositivo
+src/lib/xlsx.ts            lector de .xlsm/.xlsx (tablas, nombres, hojas; sin macros) (con tests)
+src/lib/finanzas.ts        cálculos de Finanzas (con tests)
+src/lib/drive.ts           Drive con drive.file: metadatos y descarga
+src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
+src/app/api/biometria      registro y desbloqueo WebAuthn
+src/app/api/drive/selector datos para el selector de Google
 src/components/actividades.tsx  módulo Actividades
 src/app/auth/google/*      conectar, callback y desconectar de Calendar
 src/app/ajustes            página de ajustes

@@ -136,3 +136,24 @@ export function BotonBloquear() {
     </button>
   );
 }
+
+/** Muestra u oculta los importes en este dispositivo (cookie); el servidor no los envía si están ocultos. */
+export function BotonImportes({ ocultos }: { ocultos: boolean }) {
+  const router = useRouter();
+  return (
+    <button
+      className="btn"
+      type="button"
+      aria-pressed={ocultos}
+      onClick={() => {
+        const secure = location.protocol === "https:" ? "; secure" : "";
+        document.cookie = ocultos
+          ? `importes=; path=/; max-age=0; samesite=strict${secure}`
+          : `importes=ocultos; path=/; max-age=31536000; samesite=strict${secure}`;
+        router.refresh();
+      }}
+    >
+      {ocultos ? "Mostrar importes" : "Ocultar importes"}
+    </button>
+  );
+}
