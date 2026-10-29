@@ -5,6 +5,7 @@ import { FicheroNoDisponible, descargar, metadatos } from "@/lib/drive";
 import { LECTURA, datosDelLibro, resumir, type Datos, type Resumen } from "@/lib/finanzas";
 import { FaltaMigracion, GoogleReconectar, SCOPE_DRIVE_FILE, accessToken, scopesConcedidos, tieneScope } from "@/lib/google";
 import { LibroInvalido, leerLibro } from "@/lib/xlsx";
+import { calcularVencimientos, type ResultadoVencimientos } from "@/lib/vencimientos";
 
 // Lee el Excel elegido de Drive al abrir el panel. Los movimientos solo viven en la memoria del
 // servidor (nunca en la base de datos); se vuelve a descargar solo si el fichero cambió en Drive.
@@ -16,7 +17,12 @@ export type ResultadoFinanzas =
   | { estado: "no_disponible" }
   | { estado: "invalido"; mensaje: string }
   | { estado: "error" }
-  | { estado: "ok"; resumen: Resumen; fichero: { nombre: string; modificado: string } };
+  | {
+      estado: "ok";
+      resumen: Resumen;
+      vencimientos: ResultadoVencimientos;
+      fichero: { nombre: string; modificado: string };
+    };
 
 let cache: { clave: string; datos: Datos } | null = null;
 
@@ -37,7 +43,12 @@ export async function cargarFinanzas(
       const datos = datosDelLibro(leerLibro(await descargar(token, meta), LECTURA));
       cache = { clave, datos };
     }
-    return { estado: "ok", resumen: resumir(cache.datos, hoy), fichero: { nombre: meta.nombre, modificado: meta.modificado } };
+    return {
+      estado: "ok",
+      resumen: resumir(cache.datos, hoy),
+      vencimientos: calcularVencimientos(cache.datos, hoy),
+      fichero: { nombre: meta.nombre, modificado: meta.modificado },
+    };
   } catch (e) {
     if (e instanceof GoogleReconectar || e instanceof FaltaMigracion) return { estado: "reconectar" };
     if (e instanceof FicheroNoDisponible) return { estado: "no_disponible" };

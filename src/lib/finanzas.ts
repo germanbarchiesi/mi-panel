@@ -41,17 +41,32 @@ export type Movimiento = {
   parte: number; // «Corresponde Germán»
 };
 
+/** Fila de tblProgramados (hoja Previsión): pagos que no son de todos los meses. */
+export type Programado = {
+  concepto: string;
+  categoria: string;
+  importe: number | null; // total; null = sin importe (fila de ejemplo)
+  frecuencia: string; // Único, Mensual, Trimestral, Anual
+  desde: number; // mes 1-12 (0 = sin mes)
+  hasta: number; // mes 1-12 (0 = sin fin)
+  estado: string; // Pendiente, Hecho
+  porcentaje: number; // % Germán (0-1)
+  dia: number | null; // 1-31; null = vacío (día 1)
+};
+
 export type Datos = {
   anio: number;
   movimientos: Movimiento[];
   categorias: string[];
   fechaCorte: string | null; // YYYY-MM-DD
+  programados: Programado[];
+  tieneColumnaDia: boolean;
 };
 
 // --- Lectura del libro --------------------------------------------------------------------
 
 export const LECTURA = {
-  tablas: ["tblMovimientos", "tblCuentas"],
+  tablas: ["tblMovimientos", "tblCuentas", "tblProgramados"],
   nombres: ["cfgAnio"],
   hojas: ["Categorías"],
 };
@@ -122,7 +137,54 @@ export function datosDelLibro(libro: Libro): Datos {
   const anio = num(libro.nombres.get("cfgAnio") ?? null);
   if (!Number.isInteger(anio) || anio < 2000 || anio > 2100) throw new LibroInvalido("cfgAnio no es un año");
 
-  return { anio, movimientos, categorias, fechaCorte };
+  const prog = libro.tablas.get("tblProgramados");
+  const programados: Programado[] = [];
+  let tieneColumnaDia = false;
+  if (prog) {
+    const opcional = (n: string) => prog.columnas.findIndex((x) => x.toLowerCase() === n.toLowerCase());
+    const p = {
+      concepto: columna(prog, "Concepto"),
+      cat: columna(prog, "Categoría"),
+      importe: columna(prog, "Importe"),
+      tipo: columna(prog, "Tipo de gasto"),
+      frec: columna(prog, "Frecuencia"),
+      desde: columna(prog, "Desde"),
+      hasta: columna(prog, "Hasta"),
+      estado: columna(prog, "Estado"),
+      pct: opcional("% Germán"),
+      dia: opcional("Día"),
+    };
+    tieneColumnaDia = p.dia >= 0;
+    for (const f of prog.filas) {
+      const concepto = txt(f[p.concepto]).slice(0, 200);
+      if (!concepto) continue;
+      const tipo = txt(f[p.tipo]);
+      const pctLeido = p.pct >= 0 ? f[p.pct] : null;
+      const porcentaje =
+        typeof pctLeido === "number"
+          ? pctLeido
+          : tipo === "Compartido"
+            ? 0.5
+            : tipo === "Individual Germán"
+              ? 1
+              : 0;
+      const imp = f[p.importe];
+      const d = p.dia >= 0 ? num(f[p.dia]) : 0;
+      programados.push({
+        concepto,
+        categoria: txt(f[p.cat]),
+        importe: typeof imp === "number" || (typeof imp === "string" && imp.trim() !== "") ? num(imp) : null,
+        frecuencia: txt(f[p.frec]),
+        desde: MESES.indexOf(txt(f[p.desde])) + 1,
+        hasta: MESES.indexOf(txt(f[p.hasta])) + 1,
+        estado: txt(f[p.estado]),
+        porcentaje: Math.min(1, Math.max(0, porcentaje)),
+        dia: Number.isInteger(d) && d >= 1 && d <= 31 ? d : null,
+      });
+    }
+  }
+
+  return { anio, movimientos, categorias, fechaCorte, programados, tieneColumnaDia };
 }
 
 // --- Cálculos ----------------------------------------------------------------------------

@@ -471,3 +471,31 @@ input[type="text"] {
   opacity: 0.6;
   cursor: progress;
 }
+
+/* --- Fase 5 · Vencimientos --- */
+.venc-fecha {
+  display: flex;
+  flex-direction: column;
+  min-width: 84px;
+  line-height: 1.25;
+}
+
+.venc-cuando {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.venc-cuando.pronto {
+  color: var(--prio-alta);
+  font-weight: 700;
+}
+
+.ev.venc.pronto {
+  border-left: 3px solid var(--prio-alta);
+  padding-left: 8px;
+}
+
+details > summary {
+  cursor: pointer;
+  min-height: 32px;
+}

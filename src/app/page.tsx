@@ -8,13 +8,12 @@ import { esEquipoTrabajo } from "@/lib/equipo";
 import { Agenda } from "@/components/agenda";
 import { Actividades, type DatosActividades } from "@/components/actividades";
 import { TzSync } from "@/components/tz-sync";
-import { Finanzas, type EstadoFinanzas } from "@/components/finanzas";
+import { FinanzasYVencimientos, type EstadoFinanzas } from "@/components/finanzas";
 import { cargarFinanzas } from "@/lib/finanzas-loader";
 import { FaltaMigracionBiometria, desbloqueadoHasta, listarCredenciales } from "@/lib/biometria";
 import { TZ_BARCELONA } from "@/lib/agenda";
 
 const PROXIMOS = [
-  { name: "Vencimientos", phase: "Fase 5" },
   { name: "Inversiones", phase: "Fase 6" },
   { name: "Deporte", phase: "Fase 7" },
   { name: "Agentes", phase: "Fase 8" },
@@ -106,7 +105,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           trasHoy={
             <>
               {actividades && <Actividades datos={actividades} sel={sel} urlApp={urlMisTareas()} tz={tz} />}
-              {finanzas && <Finanzas e={finanzas} />}
+              {finanzas && <FinanzasYVencimientos e={finanzas} />}
             </>
           }
         />

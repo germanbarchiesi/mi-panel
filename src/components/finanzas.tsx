@@ -1,6 +1,7 @@
 import { MESES, type Resumen } from "@/lib/finanzas";
 import type { ResultadoFinanzas } from "@/lib/finanzas-loader";
 import { AutoBloqueo, BotonBloquear, BotonDesbloquear, BotonImportes } from "@/components/biometria";
+import { Vencimientos } from "@/components/vencimientos";
 
 export type EstadoFinanzas =
   | { tipo: "modo_trabajo" }
@@ -175,15 +176,15 @@ export function Finanzas({ e }: { e: EstadoFinanzas }) {
   if (e.tipo === "modo_trabajo") {
     return (
       <section className="card" aria-label="Finanzas">
-        <h2>Finanzas</h2>
-        <p className="muted">No se carga en el PC de trabajo.</p>
+        <h2>Finanzas y vencimientos</h2>
+        <p className="muted">No se cargan en el PC de trabajo.</p>
       </section>
     );
   }
   if (e.tipo === "bloqueado") {
     return (
       <section className="card" aria-label="Finanzas">
-        <h2>Finanzas 🔒</h2>
+        <h2>Finanzas y vencimientos 🔒</h2>
         {e.faltaMigracion ? (
           <p className="error">Falta ejecutar la migración 0003 en Supabase (SQL Editor).</p>
         ) : e.hayHuella ? (
@@ -211,5 +212,15 @@ export function Finanzas({ e }: { e: EstadoFinanzas }) {
       </div>
       <Contenido r={e.r} ocultos={e.ocultos} />
     </section>
+  );
+}
+
+/** Finanzas y, debajo, Vencimientos: los dos con el mismo desbloqueo y la misma lectura del Excel. */
+export function FinanzasYVencimientos({ e }: { e: EstadoFinanzas }) {
+  return (
+    <>
+      <Finanzas e={e} />
+      {e.tipo === "abierto" && e.r.estado === "ok" && <Vencimientos r={e.r.vencimientos} ocultos={e.ocultos} />}
+    </>
   );
 }

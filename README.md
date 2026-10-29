@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 4 · Finanzas** — base (fase 1), Agenda (fase 2), Actividades con Mis tareas (fase 3) y Finanzas desde el Excel de cuentas (fase 4).
+**Estado: Fase 5 · Vencimientos** — base (fase 1), Agenda (fase 2), Actividades con Mis tareas (fase 3), Finanzas (fase 4) y Vencimientos (fase 5) desde el Excel de cuentas.
 
 ## Qué incluye la fase 1
 
@@ -47,6 +47,13 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 2. **Google Cloud → Credenciales:** crear una clave de API restringida a `https://<tu-app>.vercel.app/*` y a Google Picker API. **Google Auth Platform → Acceso a los datos:** añadir `.../auth/drive.file`.
 3. **Vercel:** `GOOGLE_PICKER_API_KEY` y `GOOGLE_PROJECT_NUMBER` (número del proyecto).
 4. **App → Ajustes:** «Reconectar Google» (acepta Drive), «Elegir Excel en Drive» y, tras volver a entrar, «Registrar huella» en cada dispositivo.
+
+## Fase 5 · Vencimientos
+
+- **Próximos 30 días**, con aviso destacado a 7 días o menos. Solo tu parte; mismo desbloqueo con huella que Finanzas y no se carga en el PC de trabajo.
+- **A · Previsión:** filas «Pendiente» de `tblProgramados` con importe, según Frecuencia (Único, Mensual, Trimestral, Anual), Desde, Hasta y la columna **«Día»** (1–31; vacía = día 1; se recorta al último día del mes). Los periódicos sin «Hasta» y los anuales siguen el año siguiente.
+- **B · Detectados** (`src/lib/vencimientos.ts`): cargos con la misma descripción (sin mes, número de cuota ni signos) al menos 3 veces, cada mes o cada trimestre (±5 días; tolera un mes sin importar) e importe estable (±15 %). Varios cargos del mismo día se suman. Activo si no se ha saltado más de un cobro antes de la fecha de corte. Se descarta lo que ya está en Previsión con la misma categoría e importe parecido, y lo que no te toca (tu parte = 0).
+- Se calcula con la misma lectura del Excel que Finanzas (`finanzas-loader.ts`); nada se guarda.
 
 ## Variables de entorno
 
@@ -103,6 +110,7 @@ src/lib/mis-tareas-api.ts  llamadas a Mis tareas (solo servidor, caché 60 s, er
 src/lib/equipo.ts          marca de «PC de Appliant» por dispositivo
 src/lib/xlsx.ts            lector de .xlsm/.xlsx (tablas, nombres, hojas; sin macros) (con tests)
 src/lib/finanzas.ts        cálculos de Finanzas (con tests)
+src/lib/vencimientos.ts    Previsión + cargos repetidos detectados (con tests)
 src/lib/drive.ts           Drive con drive.file: metadatos y descarga
 src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
 src/app/api/biometria      registro y desbloqueo WebAuthn
