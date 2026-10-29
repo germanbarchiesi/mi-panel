@@ -89,7 +89,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ acc
         transportes: c.transports ?? [],
         nombre,
       });
-      if (error) return json({ error: "guardar" }, 500);
+      if (error) {
+        console.error("biometria registro guardar", error.code, error.message);
+        return json({ error: "guardar" }, 500);
+      }
       await desbloquear(user.id);
       return json({ ok: true });
     }
@@ -137,6 +140,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ acc
     return json({ error: "accion" }, 404);
   } catch (e) {
     if (e instanceof FaltaMigracionBiometria) return json({ error: "migracion" }, 500);
-    return json({ error: "verificacion" }, 400);
+    // El mensaje de la librería no contiene secretos (p. ej. «Unexpected registration response origin»):
+    // se devuelve recortado para poder diagnosticar desde el móvil y se deja en el registro de Vercel.
+    const detalle = e instanceof Error ? e.message.slice(0, 200) : "desconocido";
+    console.error(`biometria ${accion}`, detalle);
+    return json({ error: "verificacion", detalle }, 400);
   }
 }

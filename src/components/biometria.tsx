@@ -11,6 +11,7 @@ const ERRORES: Record<string, string> = {
   reto: "La petición caducó. Inténtalo de nuevo.",
   credencial: "Este dispositivo no está registrado. Regístralo en Ajustes.",
   verificacion: "No se pudo verificar. Inténtalo de nuevo.",
+  guardar: "No se pudo guardar el dispositivo en la base de datos.",
   origen: "Petición rechazada.",
   sesion: "La sesión ha caducado. Vuelve a entrar.",
 };
@@ -23,14 +24,33 @@ async function post(accion: string, cuerpo?: unknown) {
     cache: "no-store",
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "verificacion");
+  if (!res.ok) {
+    const codigo = typeof data.error === "string" ? data.error : `http_${res.status}`;
+    throw new Error(data.detalle ? `${codigo}: ${String(data.detalle).slice(0, 120)}` : codigo);
+  }
   return data;
 }
 
+// Errores del navegador / del sistema (WebAuthn) más habituales.
+const ERRORES_NAVEGADOR: Record<string, string> = {
+  NotAllowedError: "Cancelado o caducado. Si no has cancelado tú, revisa que el móvil tenga bloqueo de pantalla con huella.",
+  InvalidStateError: "Este dispositivo ya está registrado. Usa «Desbloquear con huella».",
+  SecurityError: "El navegador ha rechazado la petición por seguridad (dominio).",
+  NotSupportedError: "Este dispositivo no admite llaves de acceso con estas opciones.",
+  AbortError: "Se ha interrumpido. Inténtalo de nuevo.",
+  ConstraintError: "El dispositivo no puede verificar tu identidad (falta huella o bloqueo de pantalla).",
+};
+
+/** Mensaje claro y, si no se reconoce, el código técnico entre paréntesis para poder diagnosticarlo. */
 function mensaje(e: unknown): string {
-  const m = e instanceof Error ? e.message : "";
-  if (e instanceof Error && e.name === "NotAllowedError") return "Cancelado.";
-  return ERRORES[m] ?? "No se pudo completar. Inténtalo de nuevo.";
+  if (!(e instanceof Error)) return "No se pudo completar. Inténtalo de nuevo.";
+  const code = (e as Error & { code?: string }).code;
+  if (ERRORES[e.message]) return ERRORES[e.message];
+  const [codigoServidor, ...resto] = e.message.split(": ");
+  if (ERRORES[codigoServidor] && resto.length) return `${ERRORES[codigoServidor]} (${resto.join(": ")})`;
+  if (ERRORES_NAVEGADOR[e.name]) return `${ERRORES_NAVEGADOR[e.name]} (${e.name}${code ? ` · ${code}` : ""})`;
+  const detalle = [e.name !== "Error" ? e.name : "", code ?? "", e.message].filter(Boolean).join(" · ").slice(0, 160);
+  return `No se pudo completar (${detalle || "sin detalle"}).`;
 }
 
 export function BotonDesbloquear() {
