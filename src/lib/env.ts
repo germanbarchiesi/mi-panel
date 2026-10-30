@@ -44,3 +44,11 @@ export function pickerConfig(): { apiKey: string; appId: string } | null {
   if (!apiKey || !appId || !/^\d{6,20}$/.test(appId)) return null;
   return { apiKey, appId };
 }
+
+/** App de Strava (strava.com/settings/api). null si no está configurada. */
+export function stravaConfig(): { clientId: string; clientSecret: string } | null {
+  const clientId = process.env.STRAVA_CLIENT_ID?.trim();
+  const clientSecret = process.env.STRAVA_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret || !/^\d{1,12}$/.test(clientId)) return null;
+  return { clientId, clientSecret };
+}

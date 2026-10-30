@@ -20,7 +20,8 @@ import {
   loginReciente,
   type Credencial,
 } from "@/lib/biometria";
-import { pickerConfig } from "@/lib/env";
+import { pickerConfig, stravaConfig } from "@/lib/env";
+import { StravaReconectar, leerConexion } from "@/lib/strava";
 import { ElegirExcel } from "@/components/elegir-excel";
 import { BotonRegistrar } from "@/components/biometria";
 import { listarCalendarios, excluidoPorDefecto, type CalendarioInfo } from "@/lib/calendar";
@@ -42,6 +43,11 @@ const ERRORES: Record<string, string> = {
   sin_permiso: "Falta el permiso de lectura de Calendar. Márcalo en la pantalla de Google y vuelve a conectar.",
   migracion: "Falta ejecutar la migración 0002 en Supabase (SQL Editor).",
   excel: "Ese fichero no es un Excel (.xlsm o .xlsx) o no se puede leer.",
+  strava_denegado: "Cancelaste el permiso en Strava. No se ha conectado nada.",
+  strava_permiso: "Falta el permiso «ver tus actividades» en Strava. Márcalo y vuelve a conectar.",
+  strava_canje: "Strava no aceptó la conexión. Revisa STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET y el dominio de la app en Strava.",
+  strava_config: "Falta configurar STRAVA_CLIENT_ID y STRAVA_CLIENT_SECRET en Vercel.",
+  strava_migracion: "Falta ejecutar la migración 0005 en Supabase (SQL Editor).",
   guardar: "No se pudo guardar la conexión.",
 };
 
@@ -140,6 +146,12 @@ export default async function AjustesPage({
     faltaMigracionHuella = e instanceof FaltaMigracionBiometria;
   }
   const puedeRegistrar = loginReciente(user);
+  let strava: "conectado" | "sin_conectar" | "falta_migracion" = "sin_conectar";
+  try {
+    strava = (await leerConexion(supabase, user.id)) ? "conectado" : "sin_conectar";
+  } catch (e) {
+    if (e instanceof StravaReconectar && e.motivo === "falta_migracion") strava = "falta_migracion";
+  }
   const tz = await zonaHoraria(ajustes);
   const equipoTrabajo = await esEquipoTrabajo();
 
@@ -184,6 +196,7 @@ export default async function AjustesPage({
       {ok === "equipo" && <p role="status">Equipo actualizado.</p>}
       {ok === "excel" && <p role="status">Excel elegido.</p>}
       {ok === "huella_borrada" && <p role="status">Dispositivo eliminado.</p>}
+      {ok === "strava_desconectado" && <p role="status">Strava desconectado.</p>}
       {error && (
         <p className="error" role="alert">
           {ERRORES[error] ?? "Ha ocurrido un error."}
@@ -283,6 +296,38 @@ export default async function AjustesPage({
             )}
           </>
         )}
+      </div>
+
+      <div className="card" id="deporte">
+        <h2>Strava</h2>
+        {!stravaConfig() ? (
+          <p className="error">Falta configurar STRAVA_CLIENT_ID y STRAVA_CLIENT_SECRET en Vercel.</p>
+        ) : strava === "falta_migracion" ? (
+          <p className="error">Falta ejecutar la migración 0005 en Supabase (SQL Editor).</p>
+        ) : (
+          <>
+            <p className="muted">
+              {strava === "conectado"
+                ? "Conectado (solo lectura de actividades). Las actividades no se guardan."
+                : "Conecta Strava para ver en Deporte lo que has hecho cada día."}
+            </p>
+            <div className="acciones">
+              <a className="btn btn-primary" href="/auth/strava/conectar">
+                {strava === "conectado" ? "Reconectar" : "Conectar Strava"}
+              </a>
+              {strava === "conectado" && (
+                <form action="/auth/strava/desconectar" method="post">
+                  <button className="btn" type="submit">
+                    Desconectar
+                  </button>
+                </form>
+              )}
+            </div>
+          </>
+        )}
+        <p className="muted small">
+          Lo planificado sale del calendario de Google «Deporte». Natación cuenta como natación; fuerza y CrossFit, juntos.
+        </p>
       </div>
 
       <div className="card">

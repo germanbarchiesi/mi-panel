@@ -12,9 +12,10 @@ import { FinanzasYVencimientos, type EstadoFinanzas } from "@/components/finanza
 import { cargarFinanzas } from "@/lib/finanzas-loader";
 import { FaltaMigracionBiometria, desbloqueadoHasta, listarCredenciales } from "@/lib/biometria";
 import { TZ_BARCELONA } from "@/lib/agenda";
+import { cargarDeporte } from "@/lib/deporte-loader";
+import { Deporte } from "@/components/deporte";
 
 const PROXIMOS = [
-  { name: "Deporte", phase: "Fase 7" },
   { name: "Agentes", phase: "Fase 8" },
 ];
 
@@ -34,12 +35,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const ambito = ambitoApi(sel);
   const hoy = hoyEn(tz);
 
-  const [agenda, resumen] = user && ajustes
+  const [agenda, resumen, deporte] = user && ajustes
     ? await Promise.all([
         cargarAgenda(supabase, user.id, ajustes, tz, ambito),
         pedirResumen(hoy, ambito).catch(() => ({ ok: false as const, fallo: "respuesta" as const })),
+        cargarDeporte(supabase, user.id, tz, hoy).catch(() => null),
       ])
-    : [null, null];
+    : [null, null, null];
 
   // Finanzas: el servidor solo las lee con el desbloqueo por huella vigente, y nunca en el PC de trabajo.
   // El mes de las finanzas sigue siempre la hora de Barcelona, como el Excel.
@@ -104,6 +106,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           trasHoy={
             <>
               {actividades && <Actividades datos={actividades} sel={sel} urlApp={urlMisTareas()} tz={tz} />}
+              {deporte && <Deporte r={deporte} />}
               {finanzas && <FinanzasYVencimientos e={finanzas} />}
             </>
           }

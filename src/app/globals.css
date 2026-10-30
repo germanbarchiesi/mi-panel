@@ -546,3 +546,42 @@ details > summary {
   margin: 0 0 8px;
   padding-left: 18px;
 }
+
+/* --- Fase 7 · Deporte --- */
+.dep-dia {
+  min-width: 64px;
+  text-transform: capitalize;
+}
+
+.dia-dep.hoy .dep-dia {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.dep-item {
+  display: block;
+}
+
+.dep-icono {
+  display: inline-block;
+  width: 1.1em;
+  text-align: center;
+  font-weight: 700;
+}
+
+.dep-item.hecho .dep-icono,
+.dep-item.extra .dep-icono {
+  color: var(--prio-baja);
+}
+
+.dep-item.no_hecho .dep-icono {
+  color: var(--prio-alta);
+}
+
+.dep-item.no_hecho {
+  color: var(--muted);
+}
+
+.dep-item.pendiente .dep-icono {
+  color: var(--prio-media);
+}

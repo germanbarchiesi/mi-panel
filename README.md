@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 6 · Inversiones** — base (1), Agenda (2), Actividades con Mis tareas (3) y, desde el Excel de cuentas, Finanzas (4), Vencimientos (5) e Inversiones (6).
+**Estado: Fase 7 · Deporte** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6) y Deporte con Strava (7).
 
 ## Qué incluye la fase 1
 
@@ -63,6 +63,19 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 - **Foto diaria** (migración 0004, `fotos_cartera`): valor y aportado del día, **cifrados** con AES-256-GCM; la base de datos solo ve la fecha. Se guarda al abrir el panel desbloqueado; con el resumen de las 7:00 (fase 9) será diaria. Sin la migración, la evolución usa solo `tblEvolucion`.
 - Mismo desbloqueo con huella; ocultar importes; no se carga en el PC de trabajo.
 
+## Fase 7 · Deporte
+
+- **Semana de lunes a domingo:** lo planificado sale del calendario de Google **«Deporte»** (por nombre, aunque no esté marcado en la Agenda); lo hecho, de **Strava** (`activity:read_all`, solo lectura).
+- **Emparejado** (`src/lib/deporte.ts`): cada sesión planificada se marca hecha si ese día hay una actividad del mismo tipo. Natación = `Swim`; fuerza y CrossFit van juntos (`WeightTraining`, `Crossfit`, `Workout`, HIIT). Los paseos no cuentan. Estados: hecho, no hecho, pendiente hoy, planificado, y extra (hecho sin plan).
+- **Strava** (`src/lib/strava.ts`): OAuth con `state`; el refresh token se guarda **cifrado** (migración 0005) y se vuelve a guardar si Strava lo rota. Actividades en memoria 10 min; no se guardan. Desconectar revoca el permiso en Strava.
+
+### Puesta en marcha de la fase 7
+
+1. **Strava → strava.com/settings/api:** crear la app (nombre «Mi Panel», web `https://<tu-app>.vercel.app`, **Authorization Callback Domain** = `<tu-app>.vercel.app`).
+2. **Vercel:** `STRAVA_CLIENT_ID` y `STRAVA_CLIENT_SECRET`; redeploy.
+3. **Supabase → SQL Editor:** `supabase/migrations/0005_strava.sql`.
+4. **App → Ajustes → Conectar Strava.** **Google Calendar:** crear el calendario «Deporte».
+
 ## Variables de entorno
 
 Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el código ni en el chat.
@@ -79,6 +92,8 @@ Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el c�
 | `MIS_TAREAS_API_KEY` | Clave de solo lectura de Mis tareas (`mt_` + 64 hex) (fase 3) |
 | `GOOGLE_PICKER_API_KEY` | Clave de API del selector de Google, restringida (fase 4) |
 | `GOOGLE_PROJECT_NUMBER` | Número del proyecto de Google Cloud (fase 4) |
+| `STRAVA_CLIENT_ID` | Id de la app de Strava (fase 7) |
+| `STRAVA_CLIENT_SECRET` | Secreto de la app de Strava (fase 7) |
 
 ## Puesta en marcha (una vez)
 
@@ -122,6 +137,9 @@ src/lib/vencimientos.ts    Previsión + cargos repetidos detectados (con tests)
 src/lib/inversiones.ts     posiciones, reparto, objetivos y evolución (con tests)
 src/lib/precios.ts         cotizaciones de Yahoo y Kraken (con tests)
 src/lib/fotos-cartera.ts   foto diaria cifrada de la cartera
+src/lib/deporte.ts         semana planificada frente a hecha (con tests)
+src/lib/strava.ts          Strava: token cifrado, actividades
+src/app/auth/strava/*      conectar, callback y desconectar de Strava
 src/lib/drive.ts           Drive con drive.file: metadatos y descarga
 src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
 src/app/api/biometria      registro y desbloqueo WebAuthn
