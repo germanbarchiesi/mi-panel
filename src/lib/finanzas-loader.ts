@@ -6,6 +6,9 @@ import { LECTURA, datosDelLibro, resumir, type Datos, type Resumen } from "@/lib
 import { FaltaMigracion, GoogleReconectar, SCOPE_DRIVE_FILE, accessToken, scopesConcedidos, tieneScope } from "@/lib/google";
 import { LibroInvalido, leerLibro } from "@/lib/xlsx";
 import { calcularVencimientos, type ResultadoVencimientos } from "@/lib/vencimientos";
+import { LECTURA_INVERSIONES, datosInversiones, valorar, type DatosInversiones, type ResumenInversiones } from "@/lib/inversiones";
+import { cotizaciones } from "@/lib/precios";
+import { guardarFoto, leerFotos } from "@/lib/fotos-cartera";
 
 // Lee el Excel elegido de Drive al abrir el panel. Los movimientos solo viven en la memoria del
 // servidor (nunca en la base de datos); se vuelve a descargar solo si el fichero cambió en Drive.
@@ -21,10 +24,11 @@ export type ResultadoFinanzas =
       estado: "ok";
       resumen: Resumen;
       vencimientos: ResultadoVencimientos;
+      inversiones: ResumenInversiones | null; // null si el cálculo falla: Finanzas sigue igual
       fichero: { nombre: string; modificado: string };
     };
 
-let cache: { clave: string; datos: Datos } | null = null;
+let cache: { clave: string; datos: Datos; inversiones: DatosInversiones } | null = null;
 
 export async function cargarFinanzas(
   supabase: SupabaseClient,
@@ -40,13 +44,25 @@ export async function cargarFinanzas(
     const clave = `${userId}:${meta.id}:${meta.version}`;
     if (cache?.clave !== clave) {
       cache = null;
-      const datos = datosDelLibro(leerLibro(await descargar(token, meta), LECTURA));
-      cache = { clave, datos };
+      const libro = leerLibro(await descargar(token, meta), { ...LECTURA, ...LECTURA_INVERSIONES });
+      cache = { clave, datos: datosDelLibro(libro), inversiones: datosInversiones(libro) };
+    }
+    const { datos, inversiones: inv } = cache;
+    let inversiones: ResumenInversiones | null = null;
+    try {
+      const [cots, fotos] = await Promise.all([cotizaciones(inv.activos, hoy), leerFotos(supabase, userId)]);
+      inversiones = valorar(inv, cots, hoy, fotos);
+      if (inversiones.valor > 0 && !fotos.some((f) => f.fecha === hoy)) {
+        await guardarFoto(supabase, userId, { fecha: hoy, valor: inversiones.valor, aportado: inversiones.aportado });
+      }
+    } catch {
+      inversiones = null;
     }
     return {
       estado: "ok",
-      resumen: resumir(cache.datos, hoy),
-      vencimientos: calcularVencimientos(cache.datos, hoy),
+      resumen: resumir(datos, hoy),
+      vencimientos: calcularVencimientos(datos, hoy),
+      inversiones,
       fichero: { nombre: meta.nombre, modificado: meta.modificado },
     };
   } catch (e) {

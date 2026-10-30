@@ -499,3 +499,50 @@ details > summary {
   cursor: pointer;
   min-height: 32px;
 }
+
+/* --- Fase 6 · Inversiones --- */
+.positivo {
+  color: var(--prio-baja);
+  font-variant-numeric: tabular-nums;
+}
+
+.negativo {
+  color: var(--prio-alta);
+  font-variant-numeric: tabular-nums;
+}
+
+.barra {
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.barra > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.ev.reparto .ev-titulo {
+  flex: 1;
+}
+
+.ev.fuera .ev-titulo::after {
+  content: " ⚠";
+  color: var(--prio-alta);
+}
+
+.posicion-cifras {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+
+.alertas {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}

@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 5 · Vencimientos** — base (fase 1), Agenda (fase 2), Actividades con Mis tareas (fase 3), Finanzas (fase 4) y Vencimientos (fase 5) desde el Excel de cuentas.
+**Estado: Fase 6 · Inversiones** — base (1), Agenda (2), Actividades con Mis tareas (3) y, desde el Excel de cuentas, Finanzas (4), Vencimientos (5) e Inversiones (6).
 
 ## Qué incluye la fase 1
 
@@ -54,6 +54,14 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 - **A · Previsión:** filas «Pendiente» de `tblProgramados` con importe, según Frecuencia (Único, Mensual, Trimestral, Anual), Desde, Hasta y la columna **«Día»** (1–31; vacía = día 1; se recorta al último día del mes). Los periódicos sin «Hasta» y los anuales siguen el año siguiente.
 - **B · Detectados** (`src/lib/vencimientos.ts`): cargos con la misma descripción (sin mes, número de cuota ni signos) al menos 3 veces, cada mes o cada trimestre (±5 días; tolera un mes sin importar) e importe estable (±15 %). Varios cargos del mismo día se suman. Activo si no se ha saltado más de un cobro antes de la fecha de corte. Se descarta lo que ya está en Previsión con la misma categoría e importe parecido, y lo que no te toca (tu parte = 0).
 - Se calcula con la misma lectura del Excel que Finanzas (`finanzas-loader.ts`); nada se guarda.
+
+## Fase 6 · Inversiones
+
+- **Posiciones:** `tblActivos` (participaciones, coste, aportado, bolsa, clase, % objetivo) y la liquidez de cada bróker; `invAportado`, `invTIR` e `invBanda` como referencia. Si faltan las tablas, el módulo muestra «Sin posiciones» y Finanzas sigue igual.
+- **Precios** (`src/lib/precios.ts`, solo servidor): Yahoo para ETF, fondos y acciones (con cambio a euros y peniques → libras) y Kraken para cripto, como mucho cada 6 h por activo. Si fallan, el precio del Excel con su fecha y un aviso.
+- **Cálculo** (`src/lib/inversiones.ts`): valor, aportado neto, ganancia, rentabilidad, rentabilidad del año (aprox., desde la última foto del año anterior), reparto por bolsa y por clase, desvío de cada activo de Largo plazo frente a su % objetivo (con la banda del Excel) y evolución mensual.
+- **Foto diaria** (migración 0004, `fotos_cartera`): valor y aportado del día, **cifrados** con AES-256-GCM; la base de datos solo ve la fecha. Se guarda al abrir el panel desbloqueado; con el resumen de las 7:00 (fase 9) será diaria. Sin la migración, la evolución usa solo `tblEvolucion`.
+- Mismo desbloqueo con huella; ocultar importes; no se carga en el PC de trabajo.
 
 ## Variables de entorno
 
@@ -111,6 +119,9 @@ src/lib/equipo.ts          marca de «PC de Appliant» por dispositivo
 src/lib/xlsx.ts            lector de .xlsm/.xlsx (tablas, nombres, hojas; sin macros) (con tests)
 src/lib/finanzas.ts        cálculos de Finanzas (con tests)
 src/lib/vencimientos.ts    Previsión + cargos repetidos detectados (con tests)
+src/lib/inversiones.ts     posiciones, reparto, objetivos y evolución (con tests)
+src/lib/precios.ts         cotizaciones de Yahoo y Kraken (con tests)
+src/lib/fotos-cartera.ts   foto diaria cifrada de la cartera
 src/lib/drive.ts           Drive con drive.file: metadatos y descarga
 src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
 src/app/api/biometria      registro y desbloqueo WebAuthn

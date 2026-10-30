@@ -144,7 +144,14 @@ function leerHoja(ficheros: Record<string, Uint8Array>, ruta: string, ss: string
  */
 export function leerLibro(
   datos: Uint8Array,
-  pedir: { tablas?: string[]; nombres?: string[]; hojas?: string[] },
+  pedir: {
+    tablas?: string[];
+    nombres?: string[];
+    hojas?: string[];
+    /** Se leen si existen; si faltan, no es un error (módulos que pueden no estar en el libro). */
+    tablasOpcionales?: string[];
+    nombresOpcionales?: string[];
+  },
 ): Libro {
   let total = 0;
   let ficheros: Record<string, Uint8Array>;
@@ -182,7 +189,8 @@ export function leerLibro(
 
   // Tablas: cada hoja enlaza sus tablas en sus .rels.
   const tablas = new Map<string, Tabla>();
-  const pedidas = new Set(pedir.tablas ?? []);
+  const obligatorias = new Set(pedir.tablas ?? []);
+  const pedidas = new Set([...obligatorias, ...(pedir.tablasOpcionales ?? [])]);
   if (pedidas.size) {
     for (const rutaH of rutaHoja.values()) {
       for (const destino of relaciones(ficheros, rutaH).values()) {
@@ -204,7 +212,7 @@ export function leerLibro(
         tablas.set(nombre, { nombre, hoja: nombrePorRuta.get(rutaH) ?? "", columnas, filas });
       }
     }
-    for (const t of pedidas) if (!tablas.has(t)) throw new LibroInvalido(`Falta la tabla ${t}`);
+    for (const t of obligatorias) if (!tablas.has(t)) throw new LibroInvalido(`Falta la tabla ${t}`);
   }
 
   // Nombres definidos de una sola celda (p. ej. cfgAnio = Config!$B$2).
@@ -214,12 +222,15 @@ export function leerLibro(
     if (d["@localSheetId"] !== undefined) continue;
     definidos.set(at(d, "name"), texto(d));
   }
-  for (const n of pedir.nombres ?? []) {
+  const opcionales = new Set(pedir.nombresOpcionales ?? []);
+  for (const n of [...(pedir.nombres ?? []), ...opcionales]) {
     const def = definidos.get(n);
     const m = def && /^'?(.+?)'?!(\$?[A-Z]{1,3}\$?\d+)$/.exec(def.trim());
-    if (!m) throw new LibroInvalido(`Falta el nombre ${n} o no es una sola celda`);
-    const ruta = rutaHoja.get(m[1].replace(/''/g, "'"));
-    if (!ruta) throw new LibroInvalido(`El nombre ${n} apunta a una hoja que no existe`);
+    const ruta = m ? rutaHoja.get(m[1].replace(/''/g, "'")) : undefined;
+    if (!m || !ruta) {
+      if (opcionales.has(n)) continue;
+      throw new LibroInvalido(`Falta el nombre ${n} o no es una sola celda`);
+    }
     const { col, fila } = refCelda(m[2]);
     nombres.set(n, hoja(ruta)[fila]?.[col] ?? null);
   }

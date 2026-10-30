@@ -14,7 +14,6 @@ import { FaltaMigracionBiometria, desbloqueadoHasta, listarCredenciales } from "
 import { TZ_BARCELONA } from "@/lib/agenda";
 
 const PROXIMOS = [
-  { name: "Inversiones", phase: "Fase 6" },
   { name: "Deporte", phase: "Fase 7" },
   { name: "Agentes", phase: "Fase 8" },
 ];
