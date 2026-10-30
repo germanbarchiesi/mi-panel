@@ -585,3 +585,18 @@ details > summary {
 .dep-item.pendiente .dep-icono {
   color: var(--prio-media);
 }
+
+/* --- Fase 8 · Agentes --- */
+.agente.destacado {
+  border-color: var(--prio-media);
+  box-shadow: inset 3px 0 0 var(--prio-media);
+}
+
+.enlace-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+  min-height: 48px;
+}

@@ -33,11 +33,41 @@ export async function cargarAjustes(supabase: SupabaseClient, userId: string): P
 export async function cargarAjustesYEstado(
   supabase: SupabaseClient,
   userId: string,
-): Promise<{ ajustes: Ajustes; misTareasUltimoOk: number | null; excel: FicheroElegido | null }> {
+): Promise<{
+  ajustes: Ajustes;
+  misTareasUltimoOk: number | null;
+  excel: FicheroElegido | null;
+  agentes: FicherosAgentes | null;
+}> {
   const { data } = await supabase.from("ajustes").select("datos").eq("user_id", userId).maybeSingle();
   const raw = (data?.datos ?? {}) as Record<string, unknown>;
   const t = typeof raw.misTareasUltimoOk === "string" ? Date.parse(raw.misTareasUltimoOk) : NaN;
-  return { ajustes: normalizarAjustes(raw), misTareasUltimoOk: Number.isFinite(t) ? t : null, excel: ficheroElegido(raw.excel) };
+  return {
+    ajustes: normalizarAjustes(raw),
+    misTareasUltimoOk: Number.isFinite(t) ? t : null,
+    excel: ficheroElegido(raw.excel),
+    agentes: ficherosAgentes(raw.agentes),
+  };
+}
+
+/** Carpeta «Mi Panel · Agentes» y el id de cada fichero, por clave de agente. */
+export type FicherosAgentes = { carpeta: string; ficheros: Record<string, string> };
+
+const ID_DRIVE = /^[A-Za-z0-9_-]{10,200}$/;
+
+function ficherosAgentes(v: unknown): FicherosAgentes | null {
+  const o = (v ?? {}) as Record<string, unknown>;
+  if (typeof o.carpeta !== "string" || !ID_DRIVE.test(o.carpeta)) return null;
+  const ficheros: Record<string, string> = {};
+  for (const [k, id] of Object.entries((o.ficheros ?? {}) as Record<string, unknown>)) {
+    if (/^[a-z]{1,20}$/.test(k) && typeof id === "string" && ID_DRIVE.test(id)) ficheros[k] = id;
+  }
+  return { carpeta: o.carpeta, ficheros };
+}
+
+export async function guardarAgentes(supabase: SupabaseClient, userId: string, agentes: FicherosAgentes) {
+  const datos = { ...(await leerDatos(supabase, userId)), agentes };
+  return supabase.from("ajustes").upsert({ user_id: userId, datos, actualizado: new Date().toISOString() });
 }
 
 /** Excel de cuentas elegido con el selector de Google: solo su id y su nombre. */

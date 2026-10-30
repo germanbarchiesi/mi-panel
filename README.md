@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 7 · Deporte** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6) y Deporte con Strava (7).
+**Estado: Fase 8 · Agentes** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6), Deporte (7) y Agentes (8).
 
 ## Qué incluye la fase 1
 
@@ -76,6 +76,13 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 3. **Supabase → SQL Editor:** `supabase/migrations/0005_strava.sql`.
 4. **App → Ajustes → Conectar Strava.** **Google Calendar:** crear el calendario «Deporte».
 
+## Fase 8 · Agentes
+
+- **Solapa `/agentes`:** una tarjeta por tarea programada de Claude (vuelos, Yi Peng, regalo de Mati e informe de inversiones) con estado, titular, hasta 3 puntos, enlace (solo https), hace cuánto se ejecutó y la próxima ejecución (calculada del cron, hora de Madrid). Novedades y alertas primero. En el inicio, una línea con cuántas traen novedades.
+- **Puente por Drive:** en Ajustes, «Crear carpeta de agentes» crea «Mi Panel · Agentes» y un fichero `mi-panel-agente-<clave>.json` por agente (la app los puede leer con `drive.file` porque los crea ella). El conector de Drive de las tareas no puede reescribir el contenido, así que cada tarea escribe su resultado en JSON en la **descripción** de su fichero. La lista de agentes está en `src/lib/agentes.ts`.
+- **Privado:** el informe de inversiones solo se lee de Drive con el desbloqueo por huella vigente, sin ocultar importes y fuera del PC de trabajo.
+- Lo que escriben las tareas es dato no confiable: se valida, se recorta y los enlaces que no son https se descartan.
+
 ## Variables de entorno
 
 Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el código ni en el chat.
@@ -140,6 +147,8 @@ src/lib/fotos-cartera.ts   foto diaria cifrada de la cartera
 src/lib/deporte.ts         semana planificada frente a hecha (con tests)
 src/lib/strava.ts          Strava: token cifrado, actividades
 src/app/auth/strava/*      conectar, callback y desconectar de Strava
+src/lib/agentes.ts         lista de agentes, lectura del resultado, próxima ejecución (con tests)
+src/app/agentes            solapa de agentes
 src/lib/drive.ts           Drive con drive.file: metadatos y descarga
 src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
 src/app/api/biometria      registro y desbloqueo WebAuthn

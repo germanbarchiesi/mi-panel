@@ -66,3 +66,56 @@ export async function descargar(token: string, f: FicheroDrive): Promise<Uint8Ar
   if (buf.byteLength > MAX_EXCEL) throw new Error("El Excel es demasiado grande");
   return buf;
 }
+
+// --- Agentes (fase 8): carpeta y ficheros creados por la app (drive.file los puede leer) ---
+
+async function dpost(token: string, url: string, init: RequestInit) {
+  const res = await fetch(url, {
+    ...init,
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
+  if (res.status === 401) throw new GoogleReconectar("revocado");
+  if (!res.ok) throw new Error(`Drive API ${res.status}`);
+  return (await res.json()) as { id: string };
+}
+
+export async function crearCarpeta(token: string, nombre: string): Promise<string> {
+  const r = await dpost(token, `${API}/files?fields=id`, {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: nombre, mimeType: "application/vnd.google-apps.folder" }),
+  });
+  return r.id;
+}
+
+export async function crearFicheroJson(token: string, carpeta: string, nombre: string, contenido: string): Promise<string> {
+  const limite = `mipanel${crypto.randomUUID().replace(/-/g, "")}`;
+  const cuerpo =
+    `--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify({ name: nombre, parents: [carpeta], mimeType: "application/json" }) +
+    `\r\n--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${contenido}\r\n--${limite}--`;
+  const r = await dpost(token, "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+    headers: { "Content-Type": `multipart/related; boundary=${limite}` },
+    body: cuerpo,
+  });
+  return r.id;
+}
+
+/** Descripción de un fichero creado por la app (donde escriben las tareas). null si ya no existe. */
+export async function descripcion(token: string, id: string): Promise<{ texto: string | null; modificado: string } | null> {
+  if (!esIdDrive(id)) return null;
+  try {
+    const r = (await (await dget(token, `/files/${id}`, { fields: "id,description,modifiedTime,trashed" })).json()) as {
+      description?: string;
+      modifiedTime: string;
+      trashed?: boolean;
+    };
+    if (r.trashed) return null;
+    return { texto: r.description ?? null, modificado: r.modifiedTime };
+  } catch (e) {
+    if (e instanceof FicheroNoDisponible) return null;
+    throw e;
+  }
+}

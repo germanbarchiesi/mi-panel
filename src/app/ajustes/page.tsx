@@ -8,11 +8,13 @@ import {
   cargarAjustesYEstado,
   guardarAjustes,
   guardarExcel,
+  guardarAgentes,
   normalizarAjustes,
   registrarOkMisTareas,
 } from "@/lib/ajustes";
 import { accessToken, FaltaMigracion, GoogleReconectar, SCOPE_DRIVE_FILE, scopesConcedidos, tieneScope } from "@/lib/google";
-import { MIMES_EXCEL, esIdDrive, metadatos } from "@/lib/drive";
+import { MIMES_EXCEL, crearCarpeta, crearFicheroJson, descripcion, esIdDrive, metadatos } from "@/lib/drive";
+import { AGENTES, CARPETA_AGENTES, contenidoInicial } from "@/lib/agentes";
 import {
   FaltaMigracionBiometria,
   LOGIN_RECIENTE,
@@ -48,6 +50,7 @@ const ERRORES: Record<string, string> = {
   strava_canje: "Strava no aceptó la conexión. Revisa STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET y el dominio de la app en Strava.",
   strava_config: "Falta configurar STRAVA_CLIENT_ID y STRAVA_CLIENT_SECRET en Vercel.",
   strava_migracion: "Falta ejecutar la migración 0005 en Supabase (SQL Editor).",
+  agentes: "No se pudo crear la carpeta de agentes en Drive. Reconecta Google e inténtalo de nuevo.",
   guardar: "No se pudo guardar la conexión.",
 };
 
@@ -112,6 +115,35 @@ async function elegirExcel(id: string) {
   redirect(error ? "/ajustes?error=guardar" : "/ajustes?ok=excel#finanzas");
 }
 
+async function crearAgentes() {
+  "use server";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isOwner(user)) redirect("/login");
+  let ok = true;
+  try {
+    const token = await accessToken(supabase, user.id);
+    const { agentes } = await cargarAjustesYEstado(supabase, user.id);
+    // Reutiliza la carpeta y los ficheros que sigan existiendo; crea solo lo que falte.
+    const carpeta =
+      agentes?.carpeta && (await descripcion(token, agentes.carpeta)) ? agentes.carpeta : await crearCarpeta(token, CARPETA_AGENTES);
+    const ficheros: Record<string, string> = {};
+    for (const a of AGENTES) {
+      const id = carpeta === agentes?.carpeta ? agentes.ficheros[a.clave] : undefined;
+      ficheros[a.clave] =
+        id && (await descripcion(token, id)) ? id : await crearFicheroJson(token, carpeta, a.fichero, contenidoInicial(a));
+    }
+    const { error } = await guardarAgentes(supabase, user.id, { carpeta, ficheros });
+    ok = !error;
+  } catch {
+    ok = false;
+  }
+  revalidatePath("/");
+  redirect(ok ? "/ajustes?ok=agentes#agentes" : "/ajustes?error=agentes#agentes");
+}
+
 async function borrarHuella(formData: FormData) {
   "use server";
   const supabase = await createClient();
@@ -136,7 +168,7 @@ export default async function AjustesPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { ajustes, misTareasUltimoOk, excel } = await cargarAjustesYEstado(supabase, user.id);
+  const { ajustes, misTareasUltimoOk, excel, agentes } = await cargarAjustesYEstado(supabase, user.id);
   const conDrive = tieneScope(await scopesConcedidos(supabase, user.id), SCOPE_DRIVE_FILE);
   let credenciales: Credencial[] = [];
   let faltaMigracionHuella = false;
@@ -197,6 +229,7 @@ export default async function AjustesPage({
       {ok === "excel" && <p role="status">Excel elegido.</p>}
       {ok === "huella_borrada" && <p role="status">Dispositivo eliminado.</p>}
       {ok === "strava_desconectado" && <p role="status">Strava desconectado.</p>}
+      {ok === "agentes" && <p role="status">Carpeta de agentes lista en Drive.</p>}
       {error && (
         <p className="error" role="alert">
           {ERRORES[error] ?? "Ha ocurrido un error."}
@@ -328,6 +361,30 @@ export default async function AjustesPage({
         <p className="muted small">
           Lo planificado sale del calendario de Google «Deporte». Natación cuenta como natación; fuerza y CrossFit, juntos.
         </p>
+      </div>
+
+      <div className="card" id="agentes">
+        <h2>Agentes</h2>
+        {!conDrive ? (
+          <p className="muted">Falta el permiso de Drive: pulsa «Reconectar» en la tarjeta de Google.</p>
+        ) : (
+          <>
+            <p className="muted small">
+              Mi Panel crea en tu Drive la carpeta «{CARPETA_AGENTES}» con un fichero por tarea programada. Cada tarea escribe
+              su último resultado en la descripción de su fichero; Mi Panel solo puede leer los ficheros que ha creado.
+            </p>
+            <p className="small">
+              {agentes
+                ? `Carpeta creada · ${Object.keys(agentes.ficheros).length} de ${AGENTES.length} ficheros.`
+                : "Aún no está creada."}
+            </p>
+            <form action={crearAgentes}>
+              <button className="btn btn-primary" type="submit">
+                {agentes ? "Comprobar y recrear lo que falte" : "Crear carpeta de agentes"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
 
       <div className="card">

@@ -14,10 +14,8 @@ import { FaltaMigracionBiometria, desbloqueadoHasta, listarCredenciales } from "
 import { TZ_BARCELONA } from "@/lib/agenda";
 import { cargarDeporte } from "@/lib/deporte-loader";
 import { Deporte } from "@/components/deporte";
-
-const PROXIMOS = [
-  { name: "Agentes", phase: "Fase 8" },
-];
+import { cargarAgentes } from "@/lib/agentes-loader";
+import { ResumenAgentes } from "@/components/agentes";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ ambito?: string }> }) {
   const supabase = await createClient();
@@ -42,6 +40,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         cargarDeporte(supabase, user.id, tz, hoy).catch(() => null),
       ])
     : [null, null, null];
+  // En el inicio solo las tarjetas no privadas: el informe de inversiones se ve en /agentes con huella.
+  const agentes = user && estado ? await cargarAgentes(supabase, user.id, estado.agentes, { privadas: false }) : null;
 
   // Finanzas: el servidor solo las lee con el desbloqueo por huella vigente, y nunca en el PC de trabajo.
   // El mes de las finanzas sigue siempre la hora de Barcelona, como el Excel.
@@ -100,6 +100,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
+      {agentes && <ResumenAgentes r={agentes} />}
+
       {agenda && (
         <Agenda
           r={agenda}
@@ -113,15 +115,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         />
       )}
 
-      <h2 className="sub">Próximamente</h2>
-      <div className="grid">
-        {PROXIMOS.map((m) => (
-          <div className="tile" key={m.name}>
-            <strong>{m.name}</strong>
-            <span>{m.phase}</span>
-          </div>
-        ))}
-      </div>
     </main>
   );
 }
