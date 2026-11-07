@@ -600,3 +600,11 @@ details > summary {
   text-decoration: none;
   min-height: 48px;
 }
+
+/* --- Fase 10 · Emergencia --- */
+.btn-peligro {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  margin-top: 8px;
+}

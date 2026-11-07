@@ -152,10 +152,12 @@ test("temas por persona: primero con quien te ves hoy", () => {
   );
 });
 
-test("selector: Trabajo en el PC de Appliant, Todo en el resto; «Todo» no envía ámbito", () => {
+test("selector: siempre Trabajo en el PC de Appliant, Todo en el resto; «Todo» no envía ámbito", () => {
   assert.equal(seleccionInicial(undefined, true), "trabajo");
   assert.equal(seleccionInicial(undefined, false), "todo");
-  assert.equal(seleccionInicial("personal", true), "personal");
+  assert.equal(seleccionInicial("personal", true), "trabajo"); // modo trabajo: no se puede pedir Personal
+  assert.equal(seleccionInicial("todo", true), "trabajo");
+  assert.equal(seleccionInicial("personal", false), "personal");
   assert.equal(seleccionInicial("<script>", false), "todo");
   assert.equal(ambitoApi("todo"), undefined);
   assert.equal(ambitoApi("trabajo"), "trabajo");

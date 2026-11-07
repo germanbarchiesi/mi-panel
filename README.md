@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 9 · Resumen de las 7:00** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6), Deporte (7), Agentes (8) y Resumen (9).
+**Estado: las 10 fases desplegadas** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6), Deporte (7), Agentes (8), Resumen de las 7:00 (9) y modo trabajo (10). Siguiente: Gmail, Outlook y casa.
 
 ## Qué incluye la fase 1
 
@@ -99,6 +99,11 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 2. **Vercel:** `SUPABASE_SECRET_KEY`, `CRON_SECRET` (el valor del paso 1) y `GITHUB_DISPATCH_TOKEN`; redeploy.
 3. **App → Ajustes → Resumen de las 7:00:** activar notificaciones en el S25 y en el PC, crear la dirección del feed y «Preparar y enviar el resumen ahora».
 4. **AntennaPod:** «Añadir podcast» → por dirección → pegar la del feed; actualizar cada hora.
+
+## Fase 10 · Modo trabajo y emergencia
+
+- **PC de Appliant:** Ajustes → «Es el PC de Appliant» (cookie por dispositivo). En ese equipo el servidor no lee el Excel (ni Finanzas, ni Vencimientos, ni Inversiones), no muestra el resumen ni el informe privado de agentes, y Actividades queda fijo en **Trabajo** (sin selector; a Mis tareas solo se le pide ese ámbito, aunque se fuerce otro en la URL).
+- **Emergencia** (Ajustes, al final): revoca Google y Strava, borra sus tokens, quita las notificaciones, bloquea Finanzas y cierra la sesión en todos los dispositivos (`signOut` global). Pide escribir EMERGENCIA.
 
 ## Variables de entorno
 

@@ -24,11 +24,22 @@ const OPCIONES: { valor: Seleccion; texto: string }[] = [
   { valor: "todo", texto: "Todo" },
 ];
 
-const NOMBRE_PRIORIDAD: Record<Prioridad, string> = { alta: "Prioridad alta", media: "Prioridad media", baja: "Prioridad baja" };
+const NOMBRE_PRIORIDAD: Record<Prioridad, string> = {
+  alta: "Prioridad alta",
+  media: "Prioridad media",
+  baja: "Prioridad baja",
+};
 
 function PuntoPrioridad({ p }: { p: Prioridad | null }) {
   if (!p) return <span className="dot dot-vacio" aria-hidden="true" />;
-  return <span className={`dot prio-${p}`} role="img" aria-label={NOMBRE_PRIORIDAD[p]} title={NOMBRE_PRIORIDAD[p]} />;
+  return (
+    <span
+      className={`dot prio-${p}`}
+      role="img"
+      aria-label={NOMBRE_PRIORIDAD[p]}
+      title={NOMBRE_PRIORIDAD[p]}
+    />
+  );
 }
 
 function FilaHoy({ t }: { t: TareaHoy }) {
@@ -38,11 +49,21 @@ function FilaHoy({ t }: { t: TareaHoy }) {
       {t.hora && <span className="ev-hora">{t.hora}</span>}
       <span className="ev-titulo">
         {t.titulo}
-        {t.personas.length > 0 && <span className="muted"> · con {t.personas.join(", ")}</span>}
+        {t.personas.length > 0 && (
+          <span className="muted"> · con {t.personas.join(", ")}</span>
+        )}
         {t.proyectos.map((p) => (
           <span className="muted" key={p.nombre}>
             {" "}
-            · {p.color && <span className="dot dot-mini" style={{ background: p.color }} aria-hidden="true" />} {p.nombre}
+            ·{" "}
+            {p.color && (
+              <span
+                className="dot dot-mini"
+                style={{ background: p.color }}
+                aria-hidden="true"
+              />
+            )}{" "}
+            {p.nombre}
           </span>
         ))}
       </span>
@@ -96,7 +117,9 @@ function BloqueMarco({ m, titulo }: { m: Marco; titulo: boolean }) {
 }
 
 function sinPendientes(r: Resumen, sel: Seleccion): boolean {
-  return marcos(r, sel).every((m) => m.hoy.length === 0 && m.arrastradas.length === 0);
+  return marcos(r, sel).every(
+    (m) => m.hoy.length === 0 && m.arrastradas.length === 0,
+  );
 }
 
 export function Actividades({
@@ -104,43 +127,56 @@ export function Actividades({
   sel,
   urlApp,
   tz,
+  modoTrabajo = false,
 }: {
   datos: DatosActividades;
   sel: Seleccion;
   urlApp: string | null;
   tz: string;
+  modoTrabajo?: boolean;
 }) {
   return (
     <section className="card" aria-label="Actividades">
       <div className="row row-compacta">
         <h2>Actividades</h2>
         {urlApp && (
-          <a className="enlace small" href={urlApp} target="_blank" rel="noopener noreferrer">
+          <a
+            className="enlace small"
+            href={urlApp}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Abrir Mis tareas ↗
           </a>
         )}
       </div>
 
-      <nav className="selector" aria-label="Ámbito">
-        {OPCIONES.map((o) => (
-          <Link
-            key={o.valor}
-            href={`/?ambito=${o.valor}`}
-            className={o.valor === sel ? "seg activo" : "seg"}
-            aria-current={o.valor === sel ? "true" : undefined}
-            scroll={false}
-          >
-            {o.texto}
-          </Link>
-        ))}
-      </nav>
+      {modoTrabajo ? (
+        <p className="muted small">Modo trabajo: solo tareas de Trabajo.</p>
+      ) : (
+        <nav className="selector" aria-label="Ámbito">
+          {OPCIONES.map((o) => (
+            <Link
+              key={o.valor}
+              href={`/?ambito=${o.valor}`}
+              className={o.valor === sel ? "seg activo" : "seg"}
+              aria-current={o.valor === sel ? "true" : undefined}
+              scroll={false}
+            >
+              {o.texto}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       {datos.ok ? (
         <>
           {sinPendientes(datos.resumen, sel) ? (
             <p className="muted">Nada pendiente para hoy</p>
           ) : (
-            marcos(datos.resumen, sel).map((m) => <BloqueMarco m={m} titulo={sel === "todo"} key={m.ambito} />)
+            marcos(datos.resumen, sel).map((m) => (
+              <BloqueMarco m={m} titulo={sel === "todo"} key={m.ambito} />
+            ))
           )}
           {datos.resumen.temas.length > 0 && (
             <div className="marco">
@@ -148,7 +184,9 @@ export function Actividades({
               {temasOrdenados(datos.resumen).map((p) => (
                 <div className="persona" key={p.persona}>
                   <strong>{p.persona}</strong>
-                  {p.reunionHoy && <span className="muted small"> · te ves hoy</span>}
+                  {p.reunionHoy && (
+                    <span className="muted small"> · te ves hoy</span>
+                  )}
                   <ul className="temas">
                     {p.temas.map((t, i) => (
                       <li key={i}>{t}</li>

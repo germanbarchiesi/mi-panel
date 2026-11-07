@@ -48,8 +48,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   if (user && estado?.ajustes.horaLocal && tz !== estado.tzConocida) {
     await guardarCampo(supabase, user.id, "tzConocida", tz).catch(() => undefined);
   }
+  // El resumen lleva tareas personales y el estado de las finanzas: no se muestra en el PC de trabajo.
   const resumen7 =
-    user && supabaseSecretKey() ? await resumenDeHoy(user.id, tz).catch(() => null) : null;
+    user && !equipoTrabajo && supabaseSecretKey() ? await resumenDeHoy(user.id, tz).catch(() => null) : null;
 
   // En el inicio solo las tarjetas no privadas: el informe de inversiones se ve en /agentes con huella.
   const agentes = user && estado ? await cargarAgentes(supabase, user.id, estado.agentes, { privadas: false }) : null;
@@ -131,7 +132,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           r={agenda}
           trasHoy={
             <>
-              {actividades && <Actividades datos={actividades} sel={sel} urlApp={urlMisTareas()} tz={tz} />}
+              {actividades && <Actividades datos={actividades} sel={sel} urlApp={urlMisTareas()} tz={tz} modoTrabajo={equipoTrabajo} />}
               {deporte && <Deporte r={deporte} />}
               {finanzas && <FinanzasYVencimientos e={finanzas} />}
             </>

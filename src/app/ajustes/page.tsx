@@ -31,6 +31,7 @@ import { cronSecret, githubDispatch, supabaseSecretKey } from "@/lib/env";
 import { crearFeed, tokenFeed } from "@/lib/feed";
 import { prepararAhora, ultimoTick, zonaResumen } from "@/lib/resumen-servicio";
 import { headers } from "next/headers";
+import { emergencia } from "@/lib/emergencia";
 import { listarCalendarios, excluidoPorDefecto, type CalendarioInfo } from "@/lib/calendar";
 import { calendariosActivos, hoyEn, zonaHoraria } from "@/lib/agenda-loader";
 import { formatHora } from "@/lib/agenda";
@@ -60,6 +61,7 @@ const ERRORES: Record<string, string> = {
   agentes: "No se pudo crear la carpeta de agentes en Drive. Reconecta Google e inténtalo de nuevo.",
   resumen: "No se pudo preparar el resumen. Revisa SUPABASE_SECRET_KEY y que la migración 0006 esté ejecutada.",
   feed: "No se pudo crear la dirección del feed.",
+  confirmar: "Para usar el botón de emergencia escribe EMERGENCIA en mayúsculas.",
   guardar: "No se pudo guardar la conexión.",
 };
 
@@ -186,6 +188,18 @@ async function nuevoFeed() {
     ok = false;
   }
   redirect(ok ? "/ajustes?ok=feed#resumen" : "/ajustes?error=feed#resumen");
+}
+
+async function botonEmergencia(formData: FormData) {
+  "use server";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isOwner(user)) redirect("/login");
+  if (formData.get("confirmar") !== "EMERGENCIA") redirect("/ajustes?error=confirmar#emergencia");
+  await emergencia(supabase, user.id);
+  redirect("/login");
 }
 
 async function borrarHuella(formData: FormData) {
@@ -595,6 +609,21 @@ export default async function AjustesPage({
 
         <button className="btn btn-primary" type="submit">
           Guardar ajustes
+        </button>
+      </form>
+      <form action={botonEmergencia} className="card" id="emergencia">
+        <h2>Emergencia</h2>
+        <p className="muted small">
+          Si pierdes el móvil o crees que alguien ha entrado: revoca Google y Strava, borra sus permisos guardados, quita
+          las notificaciones y cierra la sesión en todos tus dispositivos. Después tendrás que volver a conectarlo todo.
+          La clave de Mis tareas se revoca desde Mis tareas.
+        </p>
+        <label>
+          Escribe EMERGENCIA para confirmar
+          <input type="text" name="confirmar" autoComplete="off" required pattern="EMERGENCIA" />
+        </label>
+        <button className="btn btn-peligro" type="submit">
+          Desconectar todo y cerrar sesiones
         </button>
       </form>
     </main>

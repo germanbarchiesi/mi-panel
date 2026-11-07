@@ -80,9 +80,13 @@ export function parsearSeleccion(v: unknown): Seleccion | null {
   return v === "trabajo" || v === "personal" || v === "todo" ? v : null;
 }
 
-/** Ámbito con el que abre el módulo: Trabajo en el PC de Appliant, Todo en el resto. */
+/**
+ * Ámbito del módulo. En el PC de Appliant (modo trabajo) siempre Trabajo, aunque se pida otro:
+ * el servidor no pide a Mis tareas nada personal. En el resto, el pedido o Todo.
+ */
 export function seleccionInicial(pedida: unknown, equipoTrabajo: boolean): Seleccion {
-  return parsearSeleccion(pedida) ?? (equipoTrabajo ? "trabajo" : "todo");
+  if (equipoTrabajo) return "trabajo";
+  return parsearSeleccion(pedida) ?? "todo";
 }
 
 /** Parámetro &ambito= para la API: no se envía en «Todo». */
