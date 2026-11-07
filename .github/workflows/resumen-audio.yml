@@ -1,0 +1,78 @@
+# Audio del resumen de las 7:00 con Piper (voz en español, gratis y sin enviar el texto a terceros).
+# Lo lanza Mi Panel a las 6:30 con un id y un token de UN SOLO USO (caduca a los 45 min): el texto
+# no viaja en los parámetros, se descarga con ese token en una cabecera y no se escribe en el registro.
+name: Audio del resumen
+
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "Id del resumen"
+        required: true
+      token:
+        description: "Token de un solo uso"
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: resumen-audio
+  cancel-in-progress: false
+
+jobs:
+  audio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      MI_PANEL_URL: ${{ vars.MI_PANEL_URL || 'https://mi-panel-five-olive.vercel.app' }}
+      VOZ: es_ES-davefx-medium
+    steps:
+      - name: Comprobar parámetros
+        env:
+          ID: ${{ inputs.id }}
+          TOKEN: ${{ inputs.token }}
+        run: |
+          echo "::add-mask::$TOKEN"
+          [[ "$ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || { echo "id no válido"; exit 1; }
+          [[ "$TOKEN" =~ ^[A-Za-z0-9_-]{43}$ ]] || { echo "token no válido"; exit 1; }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Caché de la voz
+        uses: actions/cache@v4
+        with:
+          path: voz
+          key: piper-${{ env.VOZ }}-v1
+
+      - name: Instalar Piper, ffmpeg y la voz
+        run: |
+          pip install --quiet --disable-pip-version-check piper-tts==1.8.0
+          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg)
+          mkdir -p voz
+          base="https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/davefx/medium"
+          [ -s "voz/$VOZ.onnx" ] || curl -fsSL --retry 3 -o "voz/$VOZ.onnx" "$base/$VOZ.onnx"
+          [ -s "voz/$VOZ.onnx.json" ] || curl -fsSL --retry 3 -o "voz/$VOZ.onnx.json" "$base/$VOZ.onnx.json"
+
+      - name: Generar y subir el audio
+        env:
+          ID: ${{ inputs.id }}
+          TOKEN: ${{ inputs.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$MI_PANEL_URL/api/resumen/texto?id=$ID" -o texto.txt
+          python3 - <<'PY'
+          import wave
+          from piper import PiperVoice
+          voz = PiperVoice.load("voz/es_ES-davefx-medium.onnx")
+          with open("texto.txt", encoding="utf-8") as f, wave.open("resumen.wav", "wb") as w:
+              voz.synthesize_wav(f.read(), w)
+          PY
+          rm -f texto.txt
+          ffmpeg -loglevel error -y -i resumen.wav -ac 1 -ar 22050 -codec:a libmp3lame -b:a 48k resumen.mp3
+          curl -fsS --max-time 60 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: audio/mpeg" \
+            --data-binary @resumen.mp3 "$MI_PANEL_URL/api/resumen/audio?id=$ID"
+          rm -f resumen.wav resumen.mp3
+          echo "Audio subido."

@@ -2,7 +2,7 @@
 
 PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el documento «Mi Panel · plan técnico».
 
-**Estado: Fase 8 · Agentes** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6), Deporte (7) y Agentes (8).
+**Estado: Fase 9 · Resumen de las 7:00** — base (1), Agenda (2), Actividades (3), Finanzas (4), Vencimientos (5), Inversiones (6), Deporte (7), Agentes (8) y Resumen (9).
 
 ## Qué incluye la fase 1
 
@@ -83,6 +83,23 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 - **Privado:** el informe de inversiones solo se lee de Drive con el desbloqueo por huella vigente, sin ocultar importes y fuera del PC de trabajo.
 - Lo que escriben las tareas es dato no confiable: se valida, se recorta y los enlaces que no son https se descartan.
 
+## Fase 9 · Resumen de las 7:00
+
+- **Cuándo:** Supabase Cron (migración 0007, `pg_cron` + `pg_net`) llama a `POST /api/resumen/tick` cada 30 min con `Authorization: Bearer CRON_SECRET` (el secreto vive en Supabase Vault). El código decide en la zona del usuario: de lunes a viernes, prepara desde las 6:30 y notifica desde las 7:00; si una llamada se pierde, la siguiente recupera (hasta las 10:00). Zona: Barcelona o, con «Usar la hora de donde estoy», la última que vio la app (`tzConocida`).
+- **Qué dice** (`src/lib/resumen.ts`, plantilla sin IA ni importes): agenda y primer hueco, tareas por ámbito (primera con hora, arrastradas, prioridad alta, con quién te ves), vencimientos a 7 y 30 días, ritmo de gasto, pendientes, deporte del día, cartera en % y agentes con novedades. Si un módulo falla, se omite (Mis tareas lo dice).
+- **Dónde:** el texto se guarda **cifrado** en `resumenes` (migración 0006). Inicio: tarjeta «Resumen de hoy» con **Escuchar** (voz del propio dispositivo).
+- **Notificación** (Web Push): «Tu resumen está listo», sin contenido. Las claves VAPID las genera la app y las guarda cifradas en `claves_app`. Ajustes → «Activar notificaciones en este dispositivo».
+- **Audio para el coche:** la app lanza `.github/workflows/resumen-audio.yml` con un id y un token de un solo uso (45 min). El flujo descarga el texto con el token en una cabecera, genera el MP3 con **Piper** (`es_ES-davefx-medium`) y lo sube a `/api/resumen/audio`; queda en Supabase Storage privado (`audios`).
+- **Feed privado** `/api/feed/<token>` para AntennaPod (token rotable en Ajustes, guardado cifrado y con hash). Episodios de 7 días; luego se borran.
+- Las tablas de la fase 9 tienen RLS sin políticas: solo el servidor (con `SUPABASE_SECRET_KEY`) las usa.
+
+### Puesta en marcha de la fase 9
+
+1. **Supabase → SQL Editor:** `0006_resumen.sql` y luego `0007_cron.sql`; copiar el valor que devuelve la última consulta.
+2. **Vercel:** `SUPABASE_SECRET_KEY`, `CRON_SECRET` (el valor del paso 1) y `GITHUB_DISPATCH_TOKEN`; redeploy.
+3. **App → Ajustes → Resumen de las 7:00:** activar notificaciones en el S25 y en el PC, crear la dirección del feed y «Preparar y enviar el resumen ahora».
+4. **AntennaPod:** «Añadir podcast» → por dirección → pegar la del feed; actualizar cada hora.
+
 ## Variables de entorno
 
 Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el código ni en el chat.
@@ -101,6 +118,9 @@ Ver `.env.example`. En producción se definen **solo en Vercel**. Nunca en el c�
 | `GOOGLE_PROJECT_NUMBER` | Número del proyecto de Google Cloud (fase 4) |
 | `STRAVA_CLIENT_ID` | Id de la app de Strava (fase 7) |
 | `STRAVA_CLIENT_SECRET` | Secreto de la app de Strava (fase 7) |
+| `SUPABASE_SECRET_KEY` | Clave secreta de Supabase, solo servidor: tareas automáticas (fase 9) |
+| `CRON_SECRET` | Secreto de Supabase Cron (lo crea la migración 0007) (fase 9) |
+| `GITHUB_DISPATCH_TOKEN` | Token fine-grained de GitHub, solo «Actions: write» en este repo (fase 9) |
 
 ## Puesta en marcha (una vez)
 
@@ -149,6 +169,10 @@ src/lib/strava.ts          Strava: token cifrado, actividades
 src/app/auth/strava/*      conectar, callback y desconectar de Strava
 src/lib/agentes.ts         lista de agentes, lectura del resultado, próxima ejecución (con tests)
 src/app/agentes            solapa de agentes
+src/lib/resumen.ts         cuándo preparar/notificar y texto del resumen (con tests)
+src/lib/resumen-servicio.ts  preparar, notificar, enlace de un solo uso, limpieza
+src/lib/push.ts, feed.ts   notificaciones Web Push y feed privado
+.github/workflows/resumen-audio.yml  audio con Piper
 src/lib/drive.ts           Drive con drive.file: metadatos y descarga
 src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
 src/app/api/biometria      registro y desbloqueo WebAuthn

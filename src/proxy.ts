@@ -6,9 +6,12 @@ import { isOwner, supabaseConfig } from "@/lib/env";
 // Lista cerrada: /auth/google/* (conexión con Calendar) exige sesión del propietario.
 // /privacidad es pública a propósito: Google exige una política de privacidad accesible para publicar la app.
 const PUBLIC_PATHS = ["/login", "/offline.html", "/privacidad", "/auth/login", "/auth/callback", "/auth/signout"];
+// Llamadas de máquinas sin sesión, cada una con su propio secreto: Supabase Cron (CRON_SECRET),
+// GitHub Actions (enlace de un solo uso) y AntennaPod (token del feed).
+const PUBLIC_PREFIXES = ["/api/resumen/tick", "/api/resumen/texto", "/api/resumen/audio", "/api/feed/"];
 
 function isPublic(pathname: string) {
-  return PUBLIC_PATHS.includes(pathname);
+  return PUBLIC_PATHS.includes(pathname) || PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p));
 }
 
 // El selector de Google (para elegir el Excel) solo se usa en Ajustes: solo ahí se permiten sus marcos.

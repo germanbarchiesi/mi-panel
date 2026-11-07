@@ -52,3 +52,23 @@ export function stravaConfig(): { clientId: string; clientSecret: string } | nul
   if (!clientId || !clientSecret || !/^\d{1,12}$/.test(clientId)) return null;
   return { clientId, clientSecret };
 }
+
+/** Clave secreta de Supabase (solo servidor): la usan las tareas automáticas, que no tienen sesión. */
+export function supabaseSecretKey(): string | null {
+  const k = process.env.SUPABASE_SECRET_KEY?.trim();
+  return k && k.length >= 20 ? k : null;
+}
+
+/** Secreto de las llamadas de Supabase Cron (Authorization: Bearer …). */
+export function cronSecret(): string | null {
+  const s = process.env.CRON_SECRET?.trim();
+  return s && s.length >= 32 ? s : null;
+}
+
+/** Token de GitHub (fine-grained, solo Actions del repo) para lanzar el audio. */
+export function githubDispatch(): { token: string; repo: string } | null {
+  const token = process.env.GITHUB_DISPATCH_TOKEN?.trim();
+  const repo = process.env.GITHUB_REPO?.trim() || "germanbarchiesi/mi-panel";
+  if (!token || !/^[\w.-]+\/[\w.-]+$/.test(repo)) return null;
+  return { token, repo };
+}

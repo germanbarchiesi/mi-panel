@@ -38,6 +38,8 @@ export async function cargarAjustesYEstado(
   misTareasUltimoOk: number | null;
   excel: FicheroElegido | null;
   agentes: FicherosAgentes | null;
+  tzConocida: string | null;
+  feed: { cifrado: string; hash: string } | null;
 }> {
   const { data } = await supabase.from("ajustes").select("datos").eq("user_id", userId).maybeSingle();
   const raw = (data?.datos ?? {}) as Record<string, unknown>;
@@ -47,6 +49,8 @@ export async function cargarAjustesYEstado(
     misTareasUltimoOk: Number.isFinite(t) ? t : null,
     excel: ficheroElegido(raw.excel),
     agentes: ficherosAgentes(raw.agentes),
+    tzConocida: typeof raw.tzConocida === "string" && raw.tzConocida.length < 64 ? raw.tzConocida : null,
+    feed: feedGuardado(raw.feed),
   };
 }
 
@@ -115,4 +119,17 @@ export async function registrarOkMisTareas(
   } catch {
     // Sin consecuencias: solo se pierde la hora mostrada en Ajustes.
   }
+}
+
+function feedGuardado(v: unknown): { cifrado: string; hash: string } | null {
+  const o = (v ?? {}) as Record<string, unknown>;
+  return typeof o.cifrado === "string" && typeof o.hash === "string" && /^[0-9a-f]{64}$/.test(o.hash)
+    ? { cifrado: o.cifrado, hash: o.hash }
+    : null;
+}
+
+/** Guarda un campo suelto de ajustes.datos sin pisar los demás. */
+export async function guardarCampo(supabase: SupabaseClient, userId: string, campo: string, valor: unknown) {
+  const datos = { ...(await leerDatos(supabase, userId)), [campo]: valor };
+  return supabase.from("ajustes").upsert({ user_id: userId, datos, actualizado: new Date().toISOString() });
 }

@@ -26,6 +26,11 @@ import { pickerConfig, stravaConfig } from "@/lib/env";
 import { StravaReconectar, leerConexion } from "@/lib/strava";
 import { ElegirExcel } from "@/components/elegir-excel";
 import { BotonRegistrar } from "@/components/biometria";
+import { Copiar, Notificaciones } from "@/components/resumen";
+import { cronSecret, githubDispatch, supabaseSecretKey } from "@/lib/env";
+import { crearFeed, tokenFeed } from "@/lib/feed";
+import { prepararAhora, ultimoTick, zonaResumen } from "@/lib/resumen-servicio";
+import { headers } from "next/headers";
 import { listarCalendarios, excluidoPorDefecto, type CalendarioInfo } from "@/lib/calendar";
 import { calendariosActivos, hoyEn, zonaHoraria } from "@/lib/agenda-loader";
 import { formatHora } from "@/lib/agenda";
@@ -36,6 +41,8 @@ import { esEquipoTrabajo, marcarEquipoTrabajo } from "@/lib/equipo";
 import { TzSync } from "@/components/tz-sync";
 
 export const metadata: Metadata = { title: "Ajustes" };
+// «Preparar resumen ahora» lee todos los módulos: necesita más tiempo que el de por defecto.
+export const maxDuration = 60;
 
 const ERRORES: Record<string, string> = {
   denegado: "Cancelaste el permiso en Google. No se ha conectado nada.",
@@ -51,6 +58,8 @@ const ERRORES: Record<string, string> = {
   strava_config: "Falta configurar STRAVA_CLIENT_ID y STRAVA_CLIENT_SECRET en Vercel.",
   strava_migracion: "Falta ejecutar la migración 0005 en Supabase (SQL Editor).",
   agentes: "No se pudo crear la carpeta de agentes en Drive. Reconecta Google e inténtalo de nuevo.",
+  resumen: "No se pudo preparar el resumen. Revisa SUPABASE_SECRET_KEY y que la migración 0006 esté ejecutada.",
+  feed: "No se pudo crear la dirección del feed.",
   guardar: "No se pudo guardar la conexión.",
 };
 
@@ -144,6 +153,41 @@ async function crearAgentes() {
   redirect(ok ? "/ajustes?ok=agentes#agentes" : "/ajustes?error=agentes#agentes");
 }
 
+async function prepararResumen() {
+  "use server";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isOwner(user)) redirect("/login");
+  let destino = "/ajustes?error=resumen#resumen";
+  try {
+    const e = await cargarAjustesYEstado(supabase, user.id);
+    const r = await prepararAhora(user.id, zonaResumen(e.ajustes.horaLocal, e.tzConocida));
+    if (r.preparado) destino = `/ajustes?ok=resumen&audio=${r.audio ? 1 : 0}&n=${r.notificados}#resumen`;
+  } catch {
+    // destino de error
+  }
+  revalidatePath("/");
+  redirect(destino);
+}
+
+async function nuevoFeed() {
+  "use server";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isOwner(user)) redirect("/login");
+  let ok = true;
+  try {
+    await crearFeed(supabase, user.id);
+  } catch {
+    ok = false;
+  }
+  redirect(ok ? "/ajustes?ok=feed#resumen" : "/ajustes?error=feed#resumen");
+}
+
 async function borrarHuella(formData: FormData) {
   "use server";
   const supabase = await createClient();
@@ -159,16 +203,22 @@ async function borrarHuella(formData: FormData) {
 export default async function AjustesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string; n?: string; audio?: string }>;
 }) {
-  const { error, ok } = await searchParams;
+  const sp = await searchParams;
+  const { error, ok } = sp;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { ajustes, misTareasUltimoOk, excel, agentes } = await cargarAjustesYEstado(supabase, user.id);
+  const { ajustes, misTareasUltimoOk, excel, agentes, feed } = await cargarAjustesYEstado(supabase, user.id);
+  const conClave = !!supabaseSecretKey();
+  const tick = conClave ? await ultimoTick().catch(() => null) : null;
+  const tokenDelFeed = tokenFeed(user.id, feed);
+  const h = await headers();
+  const origen = `https://${h.get("host") ?? "mi-panel-five-olive.vercel.app"}`;
   const conDrive = tieneScope(await scopesConcedidos(supabase, user.id), SCOPE_DRIVE_FILE);
   let credenciales: Credencial[] = [];
   let faltaMigracionHuella = false;
@@ -230,6 +280,13 @@ export default async function AjustesPage({
       {ok === "huella_borrada" && <p role="status">Dispositivo eliminado.</p>}
       {ok === "strava_desconectado" && <p role="status">Strava desconectado.</p>}
       {ok === "agentes" && <p role="status">Carpeta de agentes lista en Drive.</p>}
+      {ok === "feed" && <p role="status">Dirección del feed nueva. La anterior ya no funciona.</p>}
+      {ok === "resumen" && (
+        <p role="status">
+          Resumen preparado y enviado a {/^\d{1,2}$/.test(sp.n ?? "") ? sp.n : 0} {sp.n === "1" ? "dispositivo" : "dispositivos"}.{" "}
+          {sp.audio === "1" ? "El audio estará en el feed en unos minutos." : "Sin audio: falta GITHUB_DISPATCH_TOKEN."}
+        </p>
+      )}
       {error && (
         <p className="error" role="alert">
           {ERRORES[error] ?? "Ha ocurrido un error."}
@@ -361,6 +418,58 @@ export default async function AjustesPage({
         <p className="muted small">
           Lo planificado sale del calendario de Google «Deporte». Natación cuenta como natación; fuerza y CrossFit, juntos.
         </p>
+      </div>
+
+      <div className="card" id="resumen">
+        <h2>Resumen de las 7:00</h2>
+        {!conClave ? (
+          <p className="error">Falta configurar SUPABASE_SECRET_KEY en Vercel.</p>
+        ) : (
+          <>
+            <p className="muted small">
+              De lunes a viernes, a las 6:30 se prepara (sin importes) y a las 7:00 llega el aviso «Tu resumen está
+              listo». Supabase Cron:{" "}
+              {tick ? `última llamada ${fechaHora(tick, tz)}` : "todavía no ha llamado (falta la migración 0007 o CRON_SECRET)"}.
+              {!cronSecret() && " Falta CRON_SECRET en Vercel."}
+              {!githubDispatch() && " Sin audio para el coche: falta GITHUB_DISPATCH_TOKEN."}
+            </p>
+            <p className="etiqueta">Notificaciones</p>
+            <Notificaciones />
+            <p className="etiqueta">Feed para AntennaPod</p>
+            {tokenDelFeed ? (
+              <>
+                <p className="small" style={{ wordBreak: "break-all" }}>
+                  <code>{`${origen}/api/feed/${tokenDelFeed}`}</code>
+                </p>
+                <div className="acciones">
+                  <Copiar texto={`${origen}/api/feed/${tokenDelFeed}`} />
+                  <form action={nuevoFeed}>
+                    <button className="btn" type="submit">
+                      Cambiar dirección
+                    </button>
+                  </form>
+                </div>
+                <p className="muted small">
+                  Es privada: quien la tenga puede escuchar tus resúmenes. Si la compartes por error, cámbiala. Los episodios
+                  se borran a los 7 días.
+                </p>
+              </>
+            ) : (
+              <form action={nuevoFeed}>
+                <button className="btn btn-primary" type="submit">
+                  Crear dirección del feed
+                </button>
+              </form>
+            )}
+            <p className="etiqueta">Probar</p>
+            <form action={prepararResumen}>
+              <button className="btn" type="submit">
+                Preparar y enviar el resumen ahora
+              </button>
+            </form>
+            <p className="muted small">Rehace el de hoy y lo notifica a cualquier hora. Tarda unos segundos.</p>
+          </>
+        )}
       </div>
 
       <div className="card" id="agentes">

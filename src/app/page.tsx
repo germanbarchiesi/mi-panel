@@ -16,6 +16,10 @@ import { cargarDeporte } from "@/lib/deporte-loader";
 import { Deporte } from "@/components/deporte";
 import { cargarAgentes } from "@/lib/agentes-loader";
 import { ResumenAgentes } from "@/components/agentes";
+import { BotonEscuchar } from "@/components/resumen";
+import { resumenDeHoy } from "@/lib/resumen-servicio";
+import { supabaseSecretKey } from "@/lib/env";
+import { guardarCampo } from "@/lib/ajustes";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ ambito?: string }> }) {
   const supabase = await createClient();
@@ -40,6 +44,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         cargarDeporte(supabase, user.id, tz, hoy).catch(() => null),
       ])
     : [null, null, null];
+  // Con «Usar la hora de donde estoy», el resumen de las 7:00 sigue la última zona que vio la app.
+  if (user && estado?.ajustes.horaLocal && tz !== estado.tzConocida) {
+    await guardarCampo(supabase, user.id, "tzConocida", tz).catch(() => undefined);
+  }
+  const resumen7 =
+    user && supabaseSecretKey() ? await resumenDeHoy(user.id, tz).catch(() => null) : null;
+
   // En el inicio solo las tarjetas no privadas: el informe de inversiones se ve en /agentes con huella.
   const agentes = user && estado ? await cargarAgentes(supabase, user.id, estado.agentes, { privadas: false }) : null;
 
@@ -99,6 +110,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </form>
         </div>
       </div>
+
+      {resumen7 && (
+        <section className="card" aria-label="Resumen de hoy">
+          <div className="row row-compacta">
+            <h2>Resumen de hoy</h2>
+            <BotonEscuchar texto={resumen7.texto} />
+          </div>
+          <details>
+            <summary className="muted small">Leer el texto</summary>
+            <p className="small">{resumen7.texto}</p>
+          </details>
+        </section>
+      )}
 
       {agentes && <ResumenAgentes r={agentes} />}
 
