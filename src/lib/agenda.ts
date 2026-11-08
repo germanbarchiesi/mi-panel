@@ -138,8 +138,10 @@ export function formatDia(ymd: string): string {
 }
 
 export function formatDuracion(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
+  // Se redondea el total primero: 119,6 min son «2 h», no «1 h 60 min» (los huecos de hoy empiezan «ahora»).
+  const total = Math.max(0, Math.round(min));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   if (h && m) return `${h} h ${m} min`;
   if (h) return `${h} h`;
   return `${m} min`;
@@ -184,7 +186,8 @@ export function construirDia(
   const v = dow === 0 || dow === 6 ? ajustes.fs : ajustes.lv;
   let cursor = zonedToUtc(ymd, v.ini, tz);
   const limite = zonedToUtc(ymd, v.fin, tz);
-  if (esHoy) cursor = Math.max(cursor, ahora);
+  // Hoy el primer hueco empieza «ahora», redondeado al minuto siguiente (la hora que se muestra es exacta).
+  if (esHoy) cursor = Math.max(cursor, Math.ceil(ahora / 60000) * 60000);
 
   const ocupados = fusionar(
     conHora

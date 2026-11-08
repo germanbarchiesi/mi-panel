@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import { Icono } from "@/components/iconos";
 
 const ERRORES: Record<string, string> = {
   login_reciente: "Para añadir un dispositivo, sal y vuelve a entrar con Google; tienes 10 minutos.",
@@ -75,12 +76,13 @@ export function BotonDesbloquear() {
   }
 
   return (
-    <div>
-      <button className="btn btn-primary" type="button" onClick={desbloquear} disabled={ocupado}>
-        {ocupado ? "Esperando…" : "Desbloquear con huella"}
+    <div className="estado">
+      <button className="boton boton-primario" type="button" onClick={desbloquear} disabled={ocupado}>
+        <Icono nombre="huella" tam={20} />
+        {ocupado ? "Esperando a la huella…" : "Desbloquear con huella"}
       </button>
       {estado && (
-        <p className="error small" role="alert">
+        <p className="error" role="alert">
           {estado}
         </p>
       )}
@@ -112,21 +114,20 @@ export function BotonRegistrar({ nombrePorDefecto }: { nombrePorDefecto: string 
   }
 
   return (
-    <div className="campos">
-      <label>
+    <div className="estado">
+      <label className="campo">
         Nombre de este dispositivo
         <input type="text" value={nombre} maxLength={40} onChange={(e) => setNombre(e.target.value)} />
       </label>
-      <div>
-        <button className="btn btn-primary" type="button" onClick={registrar} disabled={ocupado}>
-          {ocupado ? "Esperando…" : "Registrar huella de este dispositivo"}
-        </button>
-        {estado && (
-          <p className="small" role="status">
-            {estado}
-          </p>
-        )}
-      </div>
+      <button className="boton boton-primario" type="button" onClick={registrar} disabled={ocupado}>
+        <Icono nombre="huella" tam={20} />
+        {ocupado ? "Esperando a la huella…" : "Registrar la huella de este dispositivo"}
+      </button>
+      {estado && (
+        <p className="nota" role="status">
+          {estado}
+        </p>
+      )}
     </div>
   );
 }
@@ -145,13 +146,14 @@ export function BotonBloquear() {
   const router = useRouter();
   return (
     <button
-      className="btn"
+      className="boton boton-pequeno"
       type="button"
       onClick={async () => {
         await post("bloquear").catch(() => undefined);
         router.refresh();
       }}
     >
+      <Icono nombre="candado" tam={16} />
       Bloquear
     </button>
   );
@@ -162,7 +164,7 @@ export function BotonImportes({ ocultos }: { ocultos: boolean }) {
   const router = useRouter();
   return (
     <button
-      className="btn"
+      className="boton boton-pequeno"
       type="button"
       aria-pressed={ocultos}
       onClick={() => {
@@ -173,6 +175,7 @@ export function BotonImportes({ ocultos }: { ocultos: boolean }) {
         router.refresh();
       }}
     >
+      <Icono nombre={ocultos ? "ojo" : "ojoTachado"} tam={16} />
       {ocultos ? "Mostrar importes" : "Ocultar importes"}
     </button>
   );

@@ -27,7 +27,7 @@ export type ResultadoAgenda =
   | { estado: "reconectar" }
   | { estado: "falta_migracion" }
   | { estado: "error"; mensaje: string }
-  | { estado: "ok"; tz: string; dias: Dia[]; calendarios: string[]; tareas: "ok" | Fallo };
+  | { estado: "ok"; tz: string; dias: Dia[]; calendarios: string[]; fallidos: string[]; tareas: "ok" | Fallo };
 
 /** «Hoy» de Mi Panel (YYYY-MM-DD) en su zona horaria. Es lo que se envía a Mis tareas como fecha. */
 export function hoyEn(tz: string): string {
@@ -66,10 +66,18 @@ export async function cargarAgenda(
     const desde = zonedToUtc(hoy, "00:00", tz);
     const hasta = zonedToUtc(addDays(hoy, 8), "00:00", tz); // hoy + 7 días
 
-    const [porCalendario, tareas] = await Promise.all([
-      Promise.all(activos.map((c) => listarEventos(token, c, desde, hasta))),
+    const [resultados, tareas] = await Promise.all([
+      Promise.allSettled(activos.map((c) => listarEventos(token, c, desde, hasta))),
       tareasP,
     ]);
+    // Un calendario que falla (p. ej. uno compartido que ya no se puede leer) no tumba la Agenda:
+    // se muestran los demás con un aviso. Si Google cerró el permiso, o fallan todos, sí es un error.
+    const fallos = resultados.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    const revocado = fallos.find((r) => r.reason instanceof GoogleReconectar);
+    if (revocado) throw revocado.reason;
+    if (fallos.length > 0 && fallos.length === activos.length) throw fallos[0].reason;
+    const fallidos = activos.filter((_, i) => resultados[i].status === "rejected").map((c) => c.nombre);
+    const porCalendario = resultados.map((r) => (r.status === "fulfilled" ? r.value : []));
 
     // Un mismo evento puede estar en dos calendarios (p. ej. el compartido): se cuenta una vez.
     const vistos = new Set<string>();
@@ -87,6 +95,7 @@ export async function cargarAgenda(
       tz,
       dias,
       calendarios: activos.map((c) => c.nombre),
+      fallidos,
       tareas: tareas.ok ? "ok" : tareas.fallo,
     };
   } catch (e) {

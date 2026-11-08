@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -8,8 +7,7 @@ import { zonaHoraria } from "@/lib/agenda-loader";
 import { cargarAgentes } from "@/lib/agentes-loader";
 import { desbloqueadoHasta } from "@/lib/biometria";
 import { esEquipoTrabajo } from "@/lib/equipo";
-import { Agentes } from "@/components/agentes";
-import { TzSync } from "@/components/tz-sync";
+import { PaginaAgentes } from "@/components/agentes";
 
 export const metadata: Metadata = { title: "Agentes" };
 
@@ -31,16 +29,5 @@ export default async function AgentesPage() {
   const privadas = !(await esEquipoTrabajo()) && !ocultos && (await desbloqueadoHasta(user.id)) !== null;
   const r = await cargarAgentes(supabase, user.id, estado.agentes, { privadas });
 
-  return (
-    <main>
-      {estado.ajustes.horaLocal && <TzSync />}
-      <div className="row">
-        <h1>Agentes</h1>
-        <Link className="btn" href="/">
-          Volver
-        </Link>
-      </div>
-      <Agentes r={r} ahora={ahoraMs()} tz={tz} privadasOcultas={!privadas} />
-    </main>
-  );
+  return <PaginaAgentes r={r} ahora={ahoraMs()} tz={tz} privadasOcultas={!privadas} horaLocal={estado.ajustes.horaLocal} />;
 }

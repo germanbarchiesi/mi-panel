@@ -24,9 +24,6 @@ import {
 } from "@/lib/biometria";
 import { pickerConfig, stravaConfig } from "@/lib/env";
 import { StravaReconectar, leerConexion } from "@/lib/strava";
-import { ElegirExcel } from "@/components/elegir-excel";
-import { BotonRegistrar } from "@/components/biometria";
-import { Copiar, Notificaciones } from "@/components/resumen";
 import { cronSecret, githubDispatch, supabaseSecretKey } from "@/lib/env";
 import { crearFeed, tokenFeed } from "@/lib/feed";
 import { prepararAhora, ultimoTick, zonaResumen } from "@/lib/resumen-servicio";
@@ -34,12 +31,11 @@ import { headers } from "next/headers";
 import { emergencia } from "@/lib/emergencia";
 import { listarCalendarios, excluidoPorDefecto, type CalendarioInfo } from "@/lib/calendar";
 import { calendariosActivos, hoyEn, zonaHoraria } from "@/lib/agenda-loader";
-import { formatHora } from "@/lib/agenda";
 import { esCalendarioMisTareas } from "@/lib/calendar";
 import { MENSAJES_FALLO } from "@/lib/mis-tareas";
 import { pedirResumen, urlMisTareas } from "@/lib/mis-tareas-api";
 import { esEquipoTrabajo, marcarEquipoTrabajo } from "@/lib/equipo";
-import { TzSync } from "@/components/tz-sync";
+import { AjustesVista, type DatosAjustes } from "@/components/ajustes-vista";
 
 export const metadata: Metadata = { title: "Ajustes" };
 // «Preparar resumen ahora» lee todos los módulos: necesita más tiempo que el de por defecto.
@@ -62,7 +58,18 @@ const ERRORES: Record<string, string> = {
   resumen: "No se pudo preparar el resumen. Revisa SUPABASE_SECRET_KEY y que la migración 0006 esté ejecutada.",
   feed: "No se pudo crear la dirección del feed.",
   confirmar: "Para usar el botón de emergencia escribe EMERGENCIA en mayúsculas.",
-  guardar: "No se pudo guardar la conexión.",
+  guardar: "No se pudo guardar. Inténtalo de nuevo.",
+};
+
+const OKS: Record<string, string> = {
+  guardado: "Ajustes de la agenda guardados.",
+  desconectado: "Google desconectado.",
+  equipo: "Equipo guardado.",
+  excel: "Excel elegido.",
+  huella_borrada: "Dispositivo quitado.",
+  strava_desconectado: "Strava desconectado.",
+  agentes: "Carpeta de agentes lista en Drive.",
+  feed: "Dirección del feed nueva. La anterior ya no funciona.",
 };
 
 async function guardar(formData: FormData) {
@@ -97,11 +104,6 @@ async function guardarEquipo(formData: FormData) {
   await marcarEquipoTrabajo(formData.get("equipo_trabajo") === "on");
   revalidatePath("/");
   redirect("/ajustes?ok=equipo");
-}
-
-function fechaHora(ms: number, tz: string): string {
-  const dia = new Intl.DateTimeFormat("es-ES", { timeZone: tz, day: "numeric", month: "short" }).format(new Date(ms));
-  return `${dia}, ${formatHora(ms, tz)}`;
 }
 
 async function elegirExcel(id: string) {
@@ -241,7 +243,6 @@ export default async function AjustesPage({
   } catch (e) {
     faltaMigracionHuella = e instanceof FaltaMigracionBiometria;
   }
-  const puedeRegistrar = loginReciente(user);
   let strava: "conectado" | "sin_conectar" | "falta_migracion" = "sin_conectar";
   try {
     strava = (await leerConexion(supabase, user.id)) ? "conectado" : "sin_conectar";
@@ -258,7 +259,6 @@ export default async function AjustesPage({
     await registrarOkMisTareas(supabase, user.id, misTareasUltimoOk, mt.obtenido);
     ultimoOk = Math.max(ultimoOk ?? 0, mt.obtenido);
   }
-  const appMisTareas = urlMisTareas();
 
   let calendarios: CalendarioInfo[] = [];
   let conectado = false;
@@ -268,364 +268,62 @@ export default async function AjustesPage({
     calendarios = await listarCalendarios(token);
     conectado = true;
   } catch (e) {
-    if (e instanceof GoogleReconectar) aviso = e.motivo === "revocado" ? "El permiso de Google se cerró. Reconecta." : null;
+    if (e instanceof GoogleReconectar) aviso = e.motivo === "revocado" ? "Google cerró el permiso. Reconecta." : null;
     else if (e instanceof FaltaMigracion) aviso = ERRORES.migracion;
-    else aviso = "No se pudo leer la lista de calendarios de Google.";
+    else aviso = "No se ha podido leer la lista de calendarios de Google.";
   }
-
   const activos = new Set(calendariosActivos(calendarios, ajustes).map((c) => c.id));
 
+  let mensaje: DatosAjustes["aviso"] = null;
+  if (error) mensaje = { tipo: "error", texto: ERRORES[error] ?? "Ha ocurrido un error." };
+  else if (ok === "resumen") {
+    const n = /^\d{1,2}$/.test(sp.n ?? "") ? Number(sp.n) : 0;
+    mensaje = {
+      tipo: "ok",
+      texto: `Resumen preparado y enviado a ${n} ${n === 1 ? "dispositivo" : "dispositivos"}. ${
+        sp.audio === "1" ? "El audio estará en el feed en unos minutos." : "Sin audio: falta GITHUB_DISPATCH_TOKEN."
+      }`,
+    };
+  } else if (ok && OKS[ok]) mensaje = { tipo: "ok", texto: OKS[ok] };
+
+  const datos: DatosAjustes = {
+    aviso: mensaje,
+    tz,
+    ajustes,
+    equipoTrabajo,
+    google: { conectado, conDrive, aviso },
+    calendarios: calendarios
+      .filter((c) => !esCalendarioMisTareas(c.nombre))
+      .map((c) => ({ id: c.id, nombre: c.nombre, color: c.color, activo: activos.has(c.id), otraVia: excluidoPorDefecto(c.nombre) })),
+    excel: excel ? { nombre: excel.nombre } : null,
+    pickerConfigurado: !!pickerConfig(),
+    huella: {
+      faltaMigracion: faltaMigracionHuella,
+      dispositivos: credenciales.map((c) => ({ id: c.id, nombre: c.nombre, usado: c.usado })),
+      puedeRegistrar: loginReciente(user),
+      minutos: LOGIN_RECIENTE / 60000,
+    },
+    strava: { configurado: !!stravaConfig(), estado: strava },
+    resumen: {
+      conClave,
+      tick,
+      cronSecret: !!cronSecret(),
+      github: !!githubDispatch(),
+      feedUrl: tokenDelFeed ? `${origen}/api/feed/${tokenDelFeed}` : null,
+    },
+    agentes: { carpeta: CARPETA_AGENTES, creados: agentes ? Object.keys(agentes.ficheros).length : null, total: AGENTES.length },
+    misTareas: {
+      ok: !!mt?.ok,
+      mensaje: mt?.ok ? "" : mt ? MENSAJES_FALLO[mt.fallo] : MENSAJES_FALLO.respuesta,
+      ultimoOk,
+      url: urlMisTareas(),
+    },
+  };
+
   return (
-    <main>
-      {ajustes.horaLocal && <TzSync />}
-      <div className="row">
-        <h1>Ajustes</h1>
-        {/* Carga completa al volver: así el inicio no hereda la CSP del selector de Google. */}
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        <a className="btn" href="/">
-          Volver
-        </a>
-      </div>
-
-      {ok === "guardado" && <p role="status">Ajustes guardados.</p>}
-      {ok === "desconectado" && <p role="status">Google Calendar desconectado.</p>}
-      {ok === "equipo" && <p role="status">Equipo actualizado.</p>}
-      {ok === "excel" && <p role="status">Excel elegido.</p>}
-      {ok === "huella_borrada" && <p role="status">Dispositivo eliminado.</p>}
-      {ok === "strava_desconectado" && <p role="status">Strava desconectado.</p>}
-      {ok === "agentes" && <p role="status">Carpeta de agentes lista en Drive.</p>}
-      {ok === "feed" && <p role="status">Dirección del feed nueva. La anterior ya no funciona.</p>}
-      {ok === "resumen" && (
-        <p role="status">
-          Resumen preparado y enviado a {/^\d{1,2}$/.test(sp.n ?? "") ? sp.n : 0} {sp.n === "1" ? "dispositivo" : "dispositivos"}.{" "}
-          {sp.audio === "1" ? "El audio estará en el feed en unos minutos." : "Sin audio: falta GITHUB_DISPATCH_TOKEN."}
-        </p>
-      )}
-      {error && (
-        <p className="error" role="alert">
-          {ERRORES[error] ?? "Ha ocurrido un error."}
-        </p>
-      )}
-
-      <div className="card">
-        <h2>Google (Calendar y Drive)</h2>
-        <p className="muted">
-          {conectado
-            ? `Calendar conectado (solo lectura). Drive: ${conDrive ? "solo el Excel que elijas" : "sin permiso; pulsa Reconectar"}.`
-            : (aviso ?? "No conectado.")}
-        </p>
-        <div className="acciones">
-          <a className="btn btn-primary" href="/auth/google/conectar">
-            {conectado ? "Reconectar" : "Conectar Google Calendar"}
-          </a>
-          {conectado && (
-            <form action="/auth/google/desconectar" method="post">
-              <button className="btn" type="submit">
-                Desconectar
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-
-      <div className="card" id="finanzas">
-        <h2>Finanzas · Excel de cuentas</h2>
-        {!conDrive ? (
-          <>
-            <p className="muted">
-              Falta el permiso de Drive. Mi Panel solo podrá leer el fichero que elijas, nunca el resto de tu Drive.
-            </p>
-            <a className="btn btn-primary" href="/auth/google/conectar">
-              Reconectar Google
-            </a>
-          </>
-        ) : !pickerConfig() ? (
-          <p className="error">Falta configurar GOOGLE_PICKER_API_KEY y GOOGLE_PROJECT_NUMBER en Vercel.</p>
-        ) : (
-          <>
-            <p className="muted">
-              {excel ? <>Leyendo: <strong>{excel.nombre}</strong>.</> : "Aún no has elegido el Excel."} Se lee al abrir
-              el panel y no se guarda ningún movimiento.
-            </p>
-            <ElegirExcel guardar={elegirExcel} texto={excel ? "Cambiar Excel" : "Elegir Excel en Drive"} />
-          </>
-        )}
-      </div>
-
-      <div className="card" id="huella">
-        <h2>Huella / Windows Hello</h2>
-        {faltaMigracionHuella ? (
-          <p className="error">Falta ejecutar la migración 0003 en Supabase (SQL Editor).</p>
-        ) : (
-          <>
-            <p className="muted small">
-              Finanzas se abre con la huella o Windows Hello de un dispositivo registrado y se bloquea a los 5 minutos.
-              Solo se guarda la clave pública: la huella no sale del dispositivo.
-            </p>
-            {credenciales.length > 0 && (
-              <ul className="evs">
-                {credenciales.map((c) => (
-                  <li className="ev" key={c.id}>
-                    <span className="ev-titulo">
-                      {c.nombre}
-                      <span className="muted small">
-                        {" "}
-                        · {c.usado ? `usado ${new Date(c.usado).toLocaleDateString("es-ES", { timeZone: tz })}` : "sin usar"}
-                      </span>
-                    </span>
-                    <form action={borrarHuella} className="derecha">
-                      <input type="hidden" name="id" value={c.id} />
-                      <button className="btn" type="submit">
-                        Quitar
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {puedeRegistrar ? (
-              <BotonRegistrar nombrePorDefecto={credenciales.length ? "Otro dispositivo" : "Este dispositivo"} />
-            ) : (
-              <>
-                <p className="small">
-                  Para añadir un dispositivo, sal y vuelve a entrar con Google: tendrás {LOGIN_RECIENTE / 60000} minutos.
-                  Así una sesión robada no basta para registrar otra huella.
-                </p>
-                <form action="/auth/signout" method="post">
-                  <button className="btn" type="submit">
-                    Salir para volver a entrar
-                  </button>
-                </form>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="card" id="deporte">
-        <h2>Strava</h2>
-        {!stravaConfig() ? (
-          <p className="error">Falta configurar STRAVA_CLIENT_ID y STRAVA_CLIENT_SECRET en Vercel.</p>
-        ) : strava === "falta_migracion" ? (
-          <p className="error">Falta ejecutar la migración 0005 en Supabase (SQL Editor).</p>
-        ) : (
-          <>
-            <p className="muted">
-              {strava === "conectado"
-                ? "Conectado (solo lectura de actividades). Las actividades no se guardan."
-                : "Conecta Strava para ver en Deporte lo que has hecho cada día."}
-            </p>
-            <div className="acciones">
-              <a className="btn btn-primary" href="/auth/strava/conectar">
-                {strava === "conectado" ? "Reconectar" : "Conectar Strava"}
-              </a>
-              {strava === "conectado" && (
-                <form action="/auth/strava/desconectar" method="post">
-                  <button className="btn" type="submit">
-                    Desconectar
-                  </button>
-                </form>
-              )}
-            </div>
-          </>
-        )}
-        <p className="muted small">
-          Lo planificado sale del calendario de Google «Deporte». Natación cuenta como natación; fuerza y CrossFit, juntos.
-        </p>
-      </div>
-
-      <div className="card" id="resumen">
-        <h2>Resumen de las 7:00</h2>
-        {!conClave ? (
-          <p className="error">Falta configurar SUPABASE_SECRET_KEY en Vercel.</p>
-        ) : (
-          <>
-            <p className="muted small">
-              De lunes a viernes, a las 6:30 se prepara (sin importes) y a las 7:00 llega el aviso «Tu resumen está
-              listo». Supabase Cron:{" "}
-              {tick ? `última llamada ${fechaHora(tick, tz)}` : "todavía no ha llamado (falta la migración 0007 o CRON_SECRET)"}.
-              {!cronSecret() && " Falta CRON_SECRET en Vercel."}
-              {!githubDispatch() && " Sin audio para el coche: falta GITHUB_DISPATCH_TOKEN."}
-            </p>
-            <p className="etiqueta">Notificaciones</p>
-            <Notificaciones />
-            <p className="etiqueta">Feed para AntennaPod</p>
-            {tokenDelFeed ? (
-              <>
-                <p className="small" style={{ wordBreak: "break-all" }}>
-                  <code>{`${origen}/api/feed/${tokenDelFeed}`}</code>
-                </p>
-                <div className="acciones">
-                  <Copiar texto={`${origen}/api/feed/${tokenDelFeed}`} />
-                  <form action={nuevoFeed}>
-                    <button className="btn" type="submit">
-                      Cambiar dirección
-                    </button>
-                  </form>
-                </div>
-                <p className="muted small">
-                  Es privada: quien la tenga puede escuchar tus resúmenes. Si la compartes por error, cámbiala. Los episodios
-                  se borran a los 7 días.
-                </p>
-              </>
-            ) : (
-              <form action={nuevoFeed}>
-                <button className="btn btn-primary" type="submit">
-                  Crear dirección del feed
-                </button>
-              </form>
-            )}
-            <p className="etiqueta">Probar</p>
-            <form action={prepararResumen}>
-              <button className="btn" type="submit">
-                Preparar y enviar el resumen ahora
-              </button>
-            </form>
-            <p className="muted small">Rehace el de hoy y lo notifica a cualquier hora. Tarda unos segundos.</p>
-          </>
-        )}
-      </div>
-
-      <div className="card" id="agentes">
-        <h2>Agentes</h2>
-        {!conDrive ? (
-          <p className="muted">Falta el permiso de Drive: pulsa «Reconectar» en la tarjeta de Google.</p>
-        ) : (
-          <>
-            <p className="muted small">
-              Mi Panel crea en tu Drive la carpeta «{CARPETA_AGENTES}» con un fichero por tarea programada. Cada tarea escribe
-              su último resultado en la descripción de su fichero; Mi Panel solo puede leer los ficheros que ha creado.
-            </p>
-            <p className="small">
-              {agentes
-                ? `Carpeta creada · ${Object.keys(agentes.ficheros).length} de ${AGENTES.length} ficheros.`
-                : "Aún no está creada."}
-            </p>
-            <form action={crearAgentes}>
-              <button className="btn btn-primary" type="submit">
-                {agentes ? "Comprobar y recrear lo que falte" : "Crear carpeta de agentes"}
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Mis tareas</h2>
-        <p className={mt?.ok ? "muted" : "error"}>
-          {mt?.ok ? "Conectada (solo lectura)." : mt ? MENSAJES_FALLO[mt.fallo] : MENSAJES_FALLO.respuesta}
-        </p>
-        <p className="muted small">
-          Última respuesta correcta: {ultimoOk ? fechaHora(ultimoOk, tz) : "ninguna todavía"}.
-          {" "}La clave solo está en Vercel; Mi Panel no guarda tus tareas.
-        </p>
-        {appMisTareas && (
-          <a className="btn" href={appMisTareas} target="_blank" rel="noopener noreferrer">
-            Abrir Mis tareas
-          </a>
-        )}
-      </div>
-
-      <form action={guardarEquipo} className="card">
-        <h2>Este equipo</h2>
-        <label className="check">
-          <input type="checkbox" name="equipo_trabajo" defaultChecked={equipoTrabajo} />
-          Es el PC de Appliant
-        </label>
-        <p className="muted small">
-          Solo afecta a este dispositivo: Actividades abre en Trabajo y solo pide ese ámbito. El modo trabajo completo
-          llega en la fase 10.
-        </p>
-        <button className="btn" type="submit">
-          Guardar equipo
-        </button>
-      </form>
-
-      <form action={guardar}>
-        {conectado && (
-          <div className="card">
-            <h2>Calendarios a mostrar</h2>
-            <input type="hidden" name="cal_lista" value="1" />
-            {calendarios.filter((c) => !esCalendarioMisTareas(c.nombre)).map((c) => (
-              <label className="check" key={c.id}>
-                <input type="checkbox" name="cal" value={c.id} defaultChecked={activos.has(c.id)} />
-                <span className="dot" style={{ background: c.color ?? "var(--muted)" }} aria-hidden="true" />
-                {c.nombre}
-                {excluidoPorDefecto(c.nombre) && <span className="muted small"> · se lee por otra vía</span>}
-              </label>
-            ))}
-            <p className="muted small">
-              «Mis tareas» no se lee nunca: sus tareas con hora llegan por su API. «Deporte» no se muestra por defecto.
-            </p>
-          </div>
-        )}
-
-        <div className="card">
-          <h2>Huecos libres</h2>
-          <p className="muted small">Se buscan solo dentro de estas franjas.</p>
-          <div className="campos">
-            <label>
-              Lun–Vie desde
-              <input type="time" name="lv_ini" defaultValue={ajustes.lv.ini} required />
-            </label>
-            <label>
-              hasta
-              <input type="time" name="lv_fin" defaultValue={ajustes.lv.fin} required />
-            </label>
-            <label>
-              Sáb–Dom desde
-              <input type="time" name="fs_ini" defaultValue={ajustes.fs.ini} required />
-            </label>
-            <label>
-              hasta
-              <input type="time" name="fs_fin" defaultValue={ajustes.fs.fin} required />
-            </label>
-            <label>
-              Duración mínima (min)
-              <input type="number" name="min_hueco" min={15} max={240} step={5} defaultValue={ajustes.minHueco} required />
-            </label>
-          </div>
-          <label className="check">
-            <input type="checkbox" name="varios_dias" defaultChecked={ajustes.variosDiasComoContexto} />
-            Eventos de varios días como contexto
-          </label>
-          <p className="muted small">
-            Los eventos con hora de 24 h o más (p. ej. un recordatorio que dura una semana) se muestran arriba con la
-            etiqueta «varios días» y no quitan huecos ni cuentan como solape.
-          </p>
-        </div>
-
-        <div className="card">
-          <h2>Zona horaria</h2>
-          <label className="check">
-            <input type="checkbox" name="hora_local" defaultChecked={ajustes.horaLocal} />
-            Usar la hora de donde estoy
-          </label>
-          <p className="muted small">
-            Ahora: {tz}. Desactivado, todo va con la hora de Barcelona. Con ella activada, la agenda se muestra con la
-            hora del dispositivo.
-          </p>
-        </div>
-
-        <button className="btn btn-primary" type="submit">
-          Guardar ajustes
-        </button>
-      </form>
-      <form action={botonEmergencia} className="card" id="emergencia">
-        <h2>Emergencia</h2>
-        <p className="muted small">
-          Si pierdes el móvil o crees que alguien ha entrado: revoca Google y Strava, borra sus permisos guardados, quita
-          las notificaciones y cierra la sesión en todos tus dispositivos. Después tendrás que volver a conectarlo todo.
-          La clave de Mis tareas se revoca desde Mis tareas.
-        </p>
-        <label>
-          Escribe EMERGENCIA para confirmar
-          <input type="text" name="confirmar" autoComplete="off" required pattern="EMERGENCIA" />
-        </label>
-        <button className="btn btn-peligro" type="submit">
-          Desconectar todo y cerrar sesiones
-        </button>
-      </form>
-    </main>
+    <AjustesVista
+      d={datos}
+      a={{ guardar, guardarEquipo, elegirExcel, crearAgentes, prepararResumen, nuevoFeed, botonEmergencia, borrarHuella }}
+    />
   );
 }

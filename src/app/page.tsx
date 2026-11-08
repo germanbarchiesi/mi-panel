@@ -1,35 +1,38 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { cargarAjustesYEstado, registrarOkMisTareas } from "@/lib/ajustes";
+import { cargarAjustesYEstado, guardarCampo, registrarOkMisTareas } from "@/lib/ajustes";
 import { cargarAgenda, hoyEn, zonaHoraria } from "@/lib/agenda-loader";
 import { ambitoApi, seleccionInicial } from "@/lib/mis-tareas";
 import { pedirResumen, urlMisTareas } from "@/lib/mis-tareas-api";
 import { esEquipoTrabajo } from "@/lib/equipo";
-import { Agenda } from "@/components/agenda";
-import { Actividades, type DatosActividades } from "@/components/actividades";
-import { TzSync } from "@/components/tz-sync";
-import { FinanzasYVencimientos, type EstadoFinanzas } from "@/components/finanzas";
 import { cargarFinanzas } from "@/lib/finanzas-loader";
 import { FaltaMigracionBiometria, desbloqueadoHasta, listarCredenciales } from "@/lib/biometria";
 import { TZ_BARCELONA } from "@/lib/agenda";
 import { cargarDeporte } from "@/lib/deporte-loader";
-import { Deporte } from "@/components/deporte";
 import { cargarAgentes } from "@/lib/agentes-loader";
-import { ResumenAgentes } from "@/components/agentes";
-import { BotonEscuchar } from "@/components/resumen";
 import { resumenDeHoy } from "@/lib/resumen-servicio";
 import { supabaseSecretKey } from "@/lib/env";
-import { guardarCampo } from "@/lib/ajustes";
+import type { DatosActividades } from "@/components/actividades";
+import type { EstadoFinanzas } from "@/components/finanzas";
+import { Inicio } from "@/components/inicio";
+
+function ahoraMs() {
+  return Date.now();
+}
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ ambito?: string }> }) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // El proxy ya exige sesión; esto cubre una sesión que caduca justo entre medias.
+  if (!user) redirect("/login");
 
-  const estado = user ? await cargarAjustesYEstado(supabase, user.id) : null;
-  const ajustes = estado?.ajustes ?? null;
-  const tz = ajustes ? await zonaHoraria(ajustes) : "Europe/Madrid";
+  const estado = await cargarAjustesYEstado(supabase, user.id);
+  const ajustes = estado.ajustes;
+  const tz = await zonaHoraria(ajustes);
+  const ahora = ahoraMs();
 
   // Actividades: el «hoy» de Mi Panel en su zona horaria; ámbito según el selector o el equipo.
   const equipoTrabajo = await esEquipoTrabajo();
@@ -37,109 +40,63 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const ambito = ambitoApi(sel);
   const hoy = hoyEn(tz);
 
-  const [agenda, resumen, deporte] = user && ajustes
-    ? await Promise.all([
-        cargarAgenda(supabase, user.id, ajustes, tz, ambito),
-        pedirResumen(hoy, ambito).catch(() => ({ ok: false as const, fallo: "respuesta" as const })),
-        cargarDeporte(supabase, user.id, tz, hoy).catch(() => null),
-      ])
-    : [null, null, null];
+  const [agenda, resumen, deporte] = await Promise.all([
+    cargarAgenda(supabase, user.id, ajustes, tz, ambito),
+    pedirResumen(hoy, ambito).catch(() => ({ ok: false as const, fallo: "respuesta" as const })),
+    cargarDeporte(supabase, user.id, tz, hoy).catch(() => null),
+  ]);
   // Con «Usar la hora de donde estoy», el resumen de las 7:00 sigue la última zona que vio la app.
-  if (user && estado?.ajustes.horaLocal && tz !== estado.tzConocida) {
+  if (ajustes.horaLocal && tz !== estado.tzConocida) {
     await guardarCampo(supabase, user.id, "tzConocida", tz).catch(() => undefined);
   }
   // El resumen lleva tareas personales y el estado de las finanzas: no se muestra en el PC de trabajo.
-  const resumen7 =
-    user && !equipoTrabajo && supabaseSecretKey() ? await resumenDeHoy(user.id, tz).catch(() => null) : null;
+  const resumen7 = !equipoTrabajo && supabaseSecretKey() ? await resumenDeHoy(user.id, tz).catch(() => null) : null;
 
   // En el inicio solo las tarjetas no privadas: el informe de inversiones se ve en /agentes con huella.
-  const agentes = user && estado ? await cargarAgentes(supabase, user.id, estado.agentes, { privadas: false }) : null;
+  const agentes = await cargarAgentes(supabase, user.id, estado.agentes, { privadas: false });
 
   // Finanzas: el servidor solo las lee con el desbloqueo por huella vigente, y nunca en el PC de trabajo.
   // El mes de las finanzas sigue siempre la hora de Barcelona, como el Excel.
-  let finanzas: EstadoFinanzas | null = null;
-  if (user && estado) {
-    if (equipoTrabajo) finanzas = { tipo: "modo_trabajo" };
-    else {
-      const hasta = await desbloqueadoHasta(user.id);
-      if (hasta) {
-        const ocultos = (await cookies()).get("importes")?.value === "ocultos";
-        const r = await cargarFinanzas(supabase, user.id, estado.excel, hoyEn(TZ_BARCELONA));
-        finanzas = { tipo: "abierto", hasta, ocultos, r };
-      } else {
-        let hayHuella = false;
-        let faltaMigracion = false;
-        try {
-          hayHuella = (await listarCredenciales(supabase, user.id)).length > 0;
-        } catch (e) {
-          faltaMigracion = e instanceof FaltaMigracionBiometria;
-        }
-        finanzas = { tipo: "bloqueado", hayHuella, faltaMigracion };
+  let finanzas: EstadoFinanzas;
+  if (equipoTrabajo) finanzas = { tipo: "modo_trabajo" };
+  else {
+    const hasta = await desbloqueadoHasta(user.id);
+    if (hasta) {
+      const ocultos = (await cookies()).get("importes")?.value === "ocultos";
+      const r = await cargarFinanzas(supabase, user.id, estado.excel, hoyEn(TZ_BARCELONA));
+      finanzas = { tipo: "abierto", hasta, ocultos, r };
+    } else {
+      let hayHuella = false;
+      let faltaMigracion = false;
+      try {
+        hayHuella = (await listarCredenciales(supabase, user.id)).length > 0;
+      } catch (e) {
+        faltaMigracion = e instanceof FaltaMigracionBiometria;
       }
+      finanzas = { tipo: "bloqueado", hayHuella, faltaMigracion };
     }
   }
 
-  let actividades: DatosActividades | null = null;
-  if (user && estado && resumen) {
-    if (resumen.ok) {
-      await registrarOkMisTareas(supabase, user.id, estado.misTareasUltimoOk, resumen.obtenido);
-      actividades = { ok: true, resumen: resumen.datos };
-    } else {
-      actividades = { ok: false, fallo: resumen.fallo, ultimoOk: estado.misTareasUltimoOk };
-    }
+  let actividades: DatosActividades;
+  if (resumen.ok) {
+    await registrarOkMisTareas(supabase, user.id, estado.misTareasUltimoOk, resumen.obtenido);
+    actividades = { ok: true, resumen: resumen.datos };
+  } else {
+    actividades = { ok: false, fallo: resumen.fallo, ultimoOk: estado.misTareasUltimoOk };
   }
 
   return (
-    <main>
-      {ajustes?.horaLocal && <TzSync />}
-      <div className="row">
-        <div>
-          <h1>Mi Panel</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            {user?.email}
-          </p>
-        </div>
-        <div className="acciones">
-          {/* Carga completa (no Link): Ajustes tiene su propia CSP para el selector de Google. */}
-          <a className="btn" href="/ajustes">
-            Ajustes
-          </a>
-          <form action="/auth/signout" method="post">
-            <button className="btn" type="submit">
-              Salir
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {resumen7 && (
-        <section className="card" aria-label="Resumen de hoy">
-          <div className="row row-compacta">
-            <h2>Resumen de hoy</h2>
-            <BotonEscuchar texto={resumen7.texto} />
-          </div>
-          <details>
-            <summary className="muted small">Leer el texto</summary>
-            <p className="small">{resumen7.texto}</p>
-          </details>
-        </section>
-      )}
-
-      {agentes && <ResumenAgentes r={agentes} />}
-
-      {agenda && (
-        <Agenda
-          r={agenda}
-          trasHoy={
-            <>
-              {actividades && <Actividades datos={actividades} sel={sel} urlApp={urlMisTareas()} tz={tz} modoTrabajo={equipoTrabajo} />}
-              {deporte && <Deporte r={deporte} />}
-              {finanzas && <FinanzasYVencimientos e={finanzas} />}
-            </>
-          }
-        />
-      )}
-
-    </main>
+    <Inicio
+      tz={tz}
+      hoy={hoy}
+      ahora={ahora}
+      horaLocal={ajustes.horaLocal}
+      agenda={agenda}
+      actividades={{ datos: actividades, sel, urlApp: urlMisTareas(), modoTrabajo: equipoTrabajo }}
+      deporte={deporte}
+      finanzas={finanzas}
+      agentes={agentes}
+      resumen7={resumen7}
+    />
   );
 }

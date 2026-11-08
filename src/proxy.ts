@@ -51,6 +51,13 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
 
+  // Demostración con datos de ejemplo: solo en `next dev` (en producción esta rama no existe).
+  if (process.env.NODE_ENV === "development" && request.nextUrl.pathname.startsWith("/demo")) {
+    const demo = NextResponse.next({ request: { headers: requestHeaders } });
+    demo.headers.set("Content-Security-Policy", csp);
+    return demo;
+  }
+
   let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const { url, key } = supabaseConfig();

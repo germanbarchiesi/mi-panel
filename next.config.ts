@@ -15,9 +15,16 @@ const securityHeaders = [
   },
 ];
 
+// Las páginas de demostración con datos de ejemplo (page.demo.tsx) solo existen con `next dev`:
+// en el build de producción no se compilan ni se publican.
+const desarrollo = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // `next dev` no escribe AGENTS.md en el repositorio.
+  agentRules: false,
+  ...(desarrollo ? { pageExtensions: ["demo.tsx", "tsx", "ts", "jsx", "js"] } : {}),
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

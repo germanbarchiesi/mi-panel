@@ -1,8 +1,10 @@
-import { formatDia } from "@/lib/agenda";
 import type { DiaDeporte, EstadoPlan, Hecho } from "@/lib/deporte";
 import type { ResultadoDeporte } from "@/lib/deporte-loader";
+import { Icono } from "@/components/iconos";
 
-const ICONO: Record<EstadoPlan, string> = { hecho: "✓", no_hecho: "✗", pendiente: "•", planificado: "○" };
+const LETRA = ["L", "M", "X", "J", "V", "S", "D"];
+const NOMBRE = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
 const TEXTO: Record<EstadoPlan, string> = {
   hecho: "Hecho",
   no_hecho: "No hecho",
@@ -10,42 +12,75 @@ const TEXTO: Record<EstadoPlan, string> = {
   planificado: "Planificado",
 };
 
-function detalle(h: Hecho) {
-  const partes = [`${h.hora}`, `${Math.round(h.minutos)} min`];
-  if (h.sportType === "Swim" && h.metros > 0) partes.push(`${(h.metros / 1000).toFixed(2).replace(".", ",")} km`);
-  return partes.join(" · ");
+/** 0 min, 45 min, 1 h 05 min. */
+export function tiempo(minutos: number) {
+  const total = Math.max(0, Math.round(minutos));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h === 0 ? `${m} min` : `${h} h ${String(m).padStart(2, "0")} min`;
 }
 
-function Dia({ d }: { d: DiaDeporte }) {
-  if (d.plan.length === 0 && d.extras.length === 0) {
-    return (
-      <li className={d.esHoy ? "ev dia-dep hoy" : "ev dia-dep"}>
-        <span className="ev-hora dep-dia">{formatDia(d.fecha).split(",")[0]}</span>
-        <span className="muted small">Descanso</span>
-      </li>
-    );
-  }
+function km(metros: number, decimales = 1) {
+  return `${(metros / 1000).toFixed(decimales).replace(".", ",")} km`;
+}
+
+function detalle(h: Hecho) {
+  const partes = [`${Math.round(h.minutos)} min`];
+  if (h.sportType === "Swim" && h.metros > 0) partes.push(km(h.metros, 2));
+  return partes.join(", ");
+}
+
+function Marca({ estado, titulo }: { estado: EstadoPlan | "extra"; titulo: string }) {
+  const nombre = estado === "extra" ? "Hecho sin planificar" : TEXTO[estado];
+  const icono = estado === "hecho" ? "check" : estado === "no_hecho" ? "cruz" : estado === "extra" ? "mas" : null;
   return (
-    <li className={d.esHoy ? "ev dia-dep hoy" : "ev dia-dep"}>
-      <span className="ev-hora dep-dia">{formatDia(d.fecha).split(",")[0]}</span>
-      <span className="ev-titulo">
-        {d.plan.map((p, i) => (
-          <span className={`dep-item ${p.estado}`} key={`p${i}`}>
-            <span aria-label={TEXTO[p.estado]} title={TEXTO[p.estado]} className="dep-icono">
-              {ICONO[p.estado]}
-            </span>{" "}
-            {p.titulo}
-            {p.hora && <span className="muted small"> · {p.hora}</span>}
-            {p.hecho && <span className="muted small"> · {detalle(p.hecho)}</span>}
+    <span className={`marca-dep marca-${estado}`} role="img" aria-label={`${nombre}: ${titulo}`} title={`${nombre}: ${titulo}`}>
+      {icono && <Icono nombre={icono} tam={14} />}
+    </span>
+  );
+}
+
+function Celda({ d, i }: { d: DiaDeporte; i: number }) {
+  const vacio = d.plan.length === 0 && d.extras.length === 0;
+  return (
+    <li className={d.esHoy ? "semana-dia hoy" : "semana-dia"}>
+      <abbr className="semana-letra" title={NOMBRE[i]}>
+        {LETRA[i]}
+      </abbr>
+      <span className="semana-marcas">
+        {vacio && <span className="semana-descanso" aria-label="Descanso" role="img" />}
+        {d.plan.map((p, k) => (
+          <Marca estado={p.estado} titulo={p.titulo} key={`p${k}`} />
+        ))}
+        {d.extras.map((h) => (
+          <Marca estado="extra" titulo={h.nombre || h.sportType} key={h.id} />
+        ))}
+      </span>
+    </li>
+  );
+}
+
+function FilaDia({ d, i }: { d: DiaDeporte; i: number }) {
+  return (
+    <li className={d.esHoy ? "fila fila-hoy" : "fila"}>
+      <span className="fila-hora">{NOMBRE[i].slice(0, 3)}</span>
+      <span aria-hidden="true" />
+      <span className="fila-cuerpo">
+        {d.plan.map((p, k) => (
+          <span className={`dep-item dep-${p.estado}`} key={`p${k}`}>
+            <span className="fila-titulo">
+              {p.titulo}
+              {p.hora && <span className="num"> {p.hora}</span>}
+            </span>
+            <span className="fila-meta">{p.hecho ? `${TEXTO.hecho}: ${detalle(p.hecho)}` : TEXTO[p.estado]}</span>
           </span>
         ))}
         {d.extras.map((h) => (
-          <span className="dep-item extra" key={h.id}>
-            <span className="dep-icono" title="Hecho sin planificar">
-              +
-            </span>{" "}
-            {h.nombre || h.sportType}
-            <span className="muted small"> · {detalle(h)}</span>
+          <span className="dep-item dep-extra" key={h.id}>
+            <span className="fila-titulo">
+              {h.nombre || h.sportType} <span className="num">{h.hora}</span>
+            </span>
+            <span className="fila-meta">Sin planificar: {detalle(h)}</span>
           </span>
         ))}
       </span>
@@ -63,48 +98,79 @@ const MENSAJE_STRAVA: Record<string, string> = {
 
 export function Deporte({ r }: { r: ResultadoDeporte }) {
   const s = r.semana;
+  const conAlgo = s.dias.map((d, i) => ({ d, i })).filter(({ d }) => d.plan.length > 0 || d.extras.length > 0);
   return (
-    <section className="card" aria-label="Deporte">
-      <h2>Deporte · esta semana</h2>
-      {r.strava === "ok" && (
-        <p className="small">
-          {s.planificados > 0 ? (
-            <>
-              <strong>
-                {s.cumplidos} de {s.planificados}
-              </strong>{" "}
-              sesiones planificadas hechas
-              {s.pendientes > 0 && <span className="muted"> · {s.pendientes} por hacer</span>}
-              {s.extras > 0 && <span className="muted"> · {s.extras} extra</span>}
-            </>
-          ) : (
+    <section className="modulo" aria-labelledby="deporte-titulo">
+      <div className="modulo-cabecera">
+        <h2 id="deporte-titulo">Deporte</h2>
+        {r.strava === "ok" && s.planificados > 0 && (
+          <p className="cabecera-dato">
             <strong>
-              {s.sesiones.natacion + s.sesiones.fuerza} {s.sesiones.natacion + s.sesiones.fuerza === 1 ? "sesión" : "sesiones"}
-            </strong>
-          )}
-          <span className="muted">
-            {" "}
-            · natación {s.sesiones.natacion}
-            {s.metrosNatacion > 0 && ` (${(s.metrosNatacion / 1000).toFixed(1).replace(".", ",")} km)`} · fuerza/CrossFit{" "}
-            {s.sesiones.fuerza} · {Math.floor(s.minutos / 60)} h {s.minutos % 60} min
-          </span>
-        </p>
+              {s.cumplidos} de {s.planificados}
+            </strong>{" "}
+            hechas
+          </p>
+        )}
+      </div>
+
+      <ol className="semana" aria-label="Esta semana">
+        {s.dias.map((d, i) => (
+          <Celda d={d} i={i} key={d.fecha} />
+        ))}
+      </ol>
+
+      {r.strava === "ok" && (
+        <dl className="cifras cifras-3">
+          <div>
+            <dt>Natación</dt>
+            <dd>
+              {s.sesiones.natacion}
+              {s.metrosNatacion > 0 && <span className="cifra-extra">{km(s.metrosNatacion)}</span>}
+            </dd>
+          </div>
+          <div>
+            <dt>Fuerza y CrossFit</dt>
+            <dd>{s.sesiones.fuerza}</dd>
+          </div>
+          <div>
+            <dt>Tiempo</dt>
+            <dd>
+              {tiempo(s.minutos)}
+            </dd>
+          </div>
+        </dl>
       )}
+
       {r.strava !== "ok" && (
-        <p className={r.strava === "sin_conectar" ? "muted" : "aviso small"}>{MENSAJE_STRAVA[r.strava]}</p>
+        <p className={r.strava === "sin_conectar" ? "nota" : "aviso"}>
+          {r.strava !== "sin_conectar" && <Icono nombre="alerta" tam={18} />}
+          <span>{MENSAJE_STRAVA[r.strava]}</span>
+        </p>
       )}
       {r.calendario === "sin_calendario" && (
-        <p className="muted small">
-          Crea en Google Calendar un calendario llamado «Deporte» y pon ahí tus sesiones (p. ej. «Natación», «CrossFit»):
-          así verás lo planificado frente a lo hecho.
+        <p className="nota">
+          Crea en Google Calendar un calendario llamado «Deporte» con tus sesiones (por ejemplo «Natación» o «CrossFit») para
+          comparar lo planificado con lo hecho.
         </p>
       )}
-      {r.calendario === "error" && <p className="aviso small">No se pudo leer el calendario «Deporte».</p>}
-      <ul className="evs">
-        {s.dias.map((d) => (
-          <Dia d={d} key={d.fecha} />
-        ))}
-      </ul>
+      {r.calendario === "sin_google" && <p className="nota">Conecta Google en Ajustes para leer el calendario «Deporte».</p>}
+      {r.calendario === "error" && (
+        <p className="aviso">
+          <Icono nombre="alerta" tam={18} />
+          <span>No se ha podido leer el calendario «Deporte».</span>
+        </p>
+      )}
+
+      {conAlgo.length > 0 && (
+        <details className="desplegable">
+          <summary>Detalle de la semana</summary>
+          <ul className="filas filas-mes">
+            {conAlgo.map(({ d, i }) => (
+              <FilaDia d={d} i={i} key={d.fecha} />
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Icono } from "@/components/iconos";
 
 const nada = () => () => {};
 const tieneVoz = () => "speechSynthesis" in window;
@@ -39,8 +40,9 @@ export function BotonEscuchar({ texto }: { texto: string }) {
   }
 
   return (
-    <button className="btn btn-primary" type="button" onClick={alternar} aria-pressed={hablando}>
-      {hablando ? "Parar" : "▶ Escuchar"}
+    <button className="boton boton-primario" type="button" onClick={alternar} aria-pressed={hablando}>
+      <Icono nombre={hablando ? "parar" : "play"} tam={16} />
+      {hablando ? "Parar" : "Escuchar"}
     </button>
   );
 }
@@ -120,36 +122,43 @@ export function Notificaciones() {
     setMsg("Notificaciones quitadas de este dispositivo.");
   }
 
-  if (estado === "cargando") return <p className="muted small">Comprobando…</p>;
+  if (estado === "cargando") return <p className="nota">Comprobando este dispositivo…</p>;
   if (estado === "no_soportado")
-    return <p className="muted small">Este navegador no admite notificaciones. En el móvil, abre Mi Panel desde la app instalada.</p>;
+    return <p className="nota">Este navegador no admite notificaciones. En el móvil, abre Mi Panel desde la app instalada.</p>;
   if (estado === "denegado")
-    return <p className="aviso small">Las notificaciones están bloqueadas para Mi Panel. Permítelas en los ajustes del navegador o del móvil.</p>;
+    return (
+      <p className="aviso">
+        <Icono nombre="alerta" tam={18} />
+        <span>Las notificaciones están bloqueadas para Mi Panel. Permítelas en los ajustes del navegador o del móvil.</span>
+      </p>
+    );
 
   return (
-    <div className="campos">
+    <div className="estado">
+      <p className={estado === "activo" ? "estado-conexion ok" : "estado-conexion"}>
+        {estado === "activo" ? "Activadas en este dispositivo" : "Desactivadas en este dispositivo"}
+      </p>
       {estado === "inactivo" && (
-        <label>
+        <label className="campo">
           Nombre de este dispositivo
           <input type="text" value={nombre} maxLength={40} onChange={(e) => setNombre(e.target.value)} />
         </label>
       )}
-      <div>
-        {estado === "activo" ? (
-          <button className="btn" type="button" onClick={quitar}>
-            Quitar notificaciones de este dispositivo
-          </button>
-        ) : (
-          <button className="btn btn-primary" type="button" onClick={activar}>
-            Activar notificaciones en este dispositivo
-          </button>
-        )}
-        {msg && (
-          <p className="small" role="status">
-            {msg}
-          </p>
-        )}
-      </div>
+      {estado === "activo" ? (
+        <button className="boton" type="button" onClick={quitar}>
+          Quitar las notificaciones
+        </button>
+      ) : (
+        <button className="boton boton-primario" type="button" onClick={activar}>
+          <Icono nombre="campana" tam={18} />
+          Activar notificaciones
+        </button>
+      )}
+      {msg && (
+        <p className="nota" role="status">
+          {msg}
+        </p>
+      )}
     </div>
   );
 }
@@ -158,7 +167,7 @@ export function Copiar({ texto }: { texto: string }) {
   const [ok, setOk] = useState(false);
   return (
     <button
-      className="btn"
+      className="boton"
       type="button"
       onClick={async () => {
         try {
@@ -170,7 +179,8 @@ export function Copiar({ texto }: { texto: string }) {
         }
       }}
     >
-      {ok ? "Copiada ✓" : "Copiar dirección"}
+      <Icono nombre={ok ? "check" : "copiar"} tam={18} />
+      {ok ? "Copiada" : "Copiar la dirección"}
     </button>
   );
 }

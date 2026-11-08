@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+// Archivo con eje de anchura (62–125 %): condensada para títulos y cifras, normal para leer. Se sirve
+// desde la propia app (CSP font-src 'self'), sin Google Fonts.
+import "@fontsource-variable/archivo/wdth.css";
 import "./globals.css";
 import { RegisterSW } from "@/components/register-sw";
 
@@ -20,11 +23,12 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f7f9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e1116" },
+    { media: "(prefers-color-scheme: light)", color: "#ecede8" },
+    { media: "(prefers-color-scheme: dark)", color: "#111419" },
   ],
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

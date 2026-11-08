@@ -116,12 +116,12 @@ export function ElegirExcel({ guardar, texto }: { guardar: (id: string) => Promi
   }
 
   return (
-    <div>
-      <button className="btn btn-primary" type="button" onClick={abrir} disabled={ocupado}>
+    <div className="estado">
+      <button className="boton boton-primario" type="button" onClick={abrir} disabled={ocupado}>
         {ocupado ? "Abriendo…" : texto}
       </button>
       {error && (
-        <p className="error small" role="alert">
+        <p className="error" role="alert">
           {error}
         </p>
       )}

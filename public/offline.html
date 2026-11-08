@@ -6,22 +6,28 @@
     <meta name="robots" content="noindex" />
     <title>Sin conexión · Mi Panel</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root { color-scheme: light dark; --papel: #ecede8; --tinta: #18202b; --tinta-2: #4a5361; }
+      @media (prefers-color-scheme: dark) { :root { --papel: #111419; --tinta: #e7e9ec; --tinta-2: #aab1bb; } }
       body {
         margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px;
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        background: #f6f7f9; color: #11151c;
+        background: var(--papel); color: var(--tinta);
       }
-      @media (prefers-color-scheme: dark) { body { background: #0e1116; color: #e8ebf0; } }
-      main { max-width: 420px; }
-      h1 { font-size: 1.4rem; margin: 0 0 8px; }
-      p { margin: 0; opacity: 0.75; }
+      main { max-width: 26rem; display: grid; gap: 12px; }
+      h1 { font-size: 2rem; line-height: 1.1; margin: 0; font-stretch: 75%; }
+      p { margin: 0; color: var(--tinta-2); line-height: 1.5; }
+      svg { width: 48px; height: 48px; }
     </style>
   </head>
   <body>
     <main>
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M9 2h14l7 7v14l-7 7H9l-7-7V9z" fill="#18202b" />
+        <rect x="6" y="14" width="20" height="4" fill="#f9f9f6" />
+        <rect x="18.5" y="9" width="3" height="14" fill="#f5c400" />
+      </svg>
       <h1>Sin conexión</h1>
-      <p>Mi Panel necesita internet para mostrar tus datos. No se guarda ninguno en este dispositivo. Vuelve a intentarlo cuando tengas conexión.</p>
+      <p>Mi Panel necesita internet para mostrar tus datos y no guarda ninguno en este dispositivo. Vuelve a abrirlo cuando tengas conexión.</p>
     </main>
   </body>
 </html>
