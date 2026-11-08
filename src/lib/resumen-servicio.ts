@@ -87,7 +87,9 @@ export async function reunirDatos(db: SupabaseClient, userId: string, tz: string
     d.agenda = {
       eventos: [
         ...dia.todoElDia.map((e) => ({ titulo: e.titulo, hora: null })),
-        ...dia.eventos.map((e) => ({ titulo: e.titulo, hora: formatHora(Math.max(e.inicio as number, dia.ini), tz) })),
+        ...dia.eventos
+          .filter((e) => !e.tarea && !e.libre)
+          .map((e) => ({ titulo: e.titulo, hora: formatHora(Math.max(e.inicio as number, dia.ini), tz) })),
       ],
       primerHueco: hueco ? { ini: formatHora(Math.max(hueco.ini, ahora), tz), fin: formatHora(hueco.fin, tz) } : null,
     };

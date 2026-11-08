@@ -110,3 +110,19 @@ test("texto del resumen: Mis tareas caída, módulos vacíos y agenda ilegible",
       "Mis tareas no ha respondido, así que hoy no incluyo tus tareas. Que tengas buen día.",
   );
 });
+
+test("texto del resumen: la primera tarea con hora es la más temprana", () => {
+  const t = componerResumen({
+    ...base,
+    tareas: {
+      ok: true,
+      hoy: [
+        { titulo: "Tarde", hora: "18:00", prioridad: null, ambito: "personal" },
+        { titulo: "Temprano", hora: "08:30", prioridad: null, ambito: "trabajo" },
+      ],
+      arrastradas: 0,
+      reunion: [],
+    },
+  });
+  assert.match(t, /La primera con hora, a las 8 y media: Temprano\./);
+});

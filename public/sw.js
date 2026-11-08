@@ -3,7 +3,7 @@
  * Solo guarda la interfaz estática (iconos y la página sin conexión). NUNCA guarda
  * respuestas de páginas, API ni datos: tareas, finanzas, etc. siempre van a red.
  */
-const CACHE = "mi-panel-shell-v2";
+const CACHE = "mi-panel-shell-v3";
 const SHELL = [
   "/offline.html",
   "/icons/icon-192.png",

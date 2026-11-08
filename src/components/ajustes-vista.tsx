@@ -28,7 +28,15 @@ export type DatosAjustes = {
     minutos: number;
   };
   strava: { configurado: boolean; estado: "conectado" | "sin_conectar" | "falta_migracion" };
-  resumen: { conClave: boolean; tick: number | null; cronSecret: boolean; github: boolean; feedUrl: string | null };
+  resumen: {
+    conClave: boolean;
+    tick: number | null;
+    /** La última llamada es de hace menos de 2 horas (el cron llama cuatro veces por hora). */
+    tickReciente: boolean;
+    cronSecret: boolean;
+    github: boolean;
+    feedUrl: string | null;
+  };
   agentes: { carpeta: string; creados: number | null; total: number };
   misTareas: { ok: boolean; mensaje: string; ultimoOk: number | null; url: string | null };
 };
@@ -184,12 +192,18 @@ export function AjustesVista({ d, a }: { d: DatosAjustes; a: AccionesAjustes }) 
               <>
                 <div className="modulo">
                   <h3>Programación</h3>
-                  <Conexion ok={!!d.resumen.tick && d.resumen.cronSecret} mal={!d.resumen.tick || !d.resumen.cronSecret}>
+                  <Conexion ok={d.resumen.tickReciente && d.resumen.cronSecret} mal={!d.resumen.tickReciente || !d.resumen.cronSecret}>
                     {d.resumen.tick
                       ? `Supabase Cron llamó por última vez el ${fechaHora(d.resumen.tick, d.tz)}`
                       : "Supabase Cron todavía no ha llamado"}
                   </Conexion>
                   {!d.resumen.tick && <p className="nota">Falta la migración 0007 o CRON_SECRET en Vercel.</p>}
+                  {d.resumen.tick && !d.resumen.tickReciente && (
+                    <p className="nota">
+                      Debería llamar cuatro veces por hora. Revisa en Supabase el trabajo «mi-panel-resumen» y sus respuestas
+                      (net._http_response).
+                    </p>
+                  )}
                   {!d.resumen.cronSecret && <p className="error">Falta CRON_SECRET en Vercel.</p>}
                   {!d.resumen.github && <p className="nota">Sin audio para el coche: falta GITHUB_DISPATCH_TOKEN.</p>}
                   <form action={a.prepararResumen}>

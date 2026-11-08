@@ -7,6 +7,7 @@ import {
   ocupadoAEventos,
   parsearOcupado,
   parsearResumen,
+  primeraConHora,
   seleccionInicial,
   temasOrdenados,
   textoArrastre,
@@ -217,4 +218,18 @@ test("texto del resumen de las 7:00 con el ejemplo", () => {
     textoResumen({ ...r, hoy: [], arrastradas: [] }),
     "Tareas: nada pendiente para hoy.",
   );
+});
+
+test("«la primera con hora» es la más temprana, aunque la API las mande en otro orden", () => {
+  const r = parsearResumen({
+    ...RESUMEN_EJEMPLO,
+    pendientes_hoy: [
+      { id: "a", titulo: "Tarde", hora: "18:00", ambito: "personal" },
+      { id: "b", titulo: "Sin hora", hora: null, ambito: "personal" },
+      { id: "c", titulo: "Mañana", hora: "09:15", ambito: "trabajo" },
+    ],
+  });
+  assert.equal(primeraConHora(r.hoy)?.titulo, "Mañana");
+  assert.match(textoResumen(r), /La primera con hora, a las 09:15: Mañana\./);
+  assert.equal(primeraConHora([]), null);
 });

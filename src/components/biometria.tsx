@@ -132,13 +132,16 @@ export function BotonRegistrar({ nombrePorDefecto }: { nombrePorDefecto: string 
   );
 }
 
-/** Vuelve a pedir la página al caducar el desbloqueo, para que los datos desaparezcan de la pantalla. */
-export function AutoBloqueo({ hasta }: { hasta: number }) {
+/**
+ * Vuelve a pedir la página al caducar el desbloqueo, para que los datos desaparezcan de la pantalla.
+ * Cuenta el tiempo que le queda según el servidor (no el reloj del dispositivo, que puede ir adelantado).
+ */
+export function AutoBloqueo({ hasta, restante }: { hasta: number; restante: number }) {
   const router = useRouter();
   useEffect(() => {
-    const t = setTimeout(() => router.refresh(), Math.max(0, hasta - Date.now()) + 500);
+    const t = setTimeout(() => router.refresh(), Math.max(1000, restante + 500));
     return () => clearTimeout(t);
-  }, [hasta, router]);
+  }, [hasta, restante, router]);
   return null;
 }
 

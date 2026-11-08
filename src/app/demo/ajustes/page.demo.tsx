@@ -49,6 +49,7 @@ export default async function DemoAjustes({ searchParams }: { searchParams: Prom
         resumen: {
           conClave: true,
           tick: sin ? null : ahora - 9 * 60_000,
+          tickReciente: !sin,
           cronSecret: true,
           github: !sin,
           feedUrl: sin ? null : "https://mi-panel-five-olive.vercel.app/api/feed/Zm9vYmFyYmF6cXV4cXV1eHF1dXpxdXV4cXV1eHF1dXo",

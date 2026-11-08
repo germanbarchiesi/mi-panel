@@ -5,6 +5,7 @@ import {
   addDays,
   construirDia,
   formatDuracion,
+  situacion,
   tramoDelDia,
   weekday,
   ymdInTz,
@@ -191,4 +192,35 @@ test("un evento nocturno corto (menos de 24 h) sigue ocupando", () => {
   const dia = construirDia("2026-10-28", [corto], AJUSTES_POR_DEFECTO, TZ, antes);
   assert.equal(dia.variosDias.length, 0);
   assert.equal(dia.eventos.length, 1);
+});
+
+test("duraciones redondeadas sobre el total: nunca «1 h 60 min»", () => {
+  assert.equal(formatDuracion(119.6), "2 h");
+  assert.equal(formatDuracion(59.6), "1 h");
+  assert.equal(formatDuracion(45.2), "45 min");
+  assert.equal(formatDuracion(-3), "0 min");
+});
+
+test("hoy, el primer hueco empieza en el minuto siguiente a «ahora»", () => {
+  const ahora = zonedToUtc("2026-10-27", "17:20", TZ) + 25_000; // 17:20:25
+  const dia = construirDia("2026-10-27", [], AJUSTES_POR_DEFECTO, TZ, ahora);
+  assert.equal(dia.huecos[0].ini, zonedToUtc("2026-10-27", "17:21", TZ));
+});
+
+test("situación: lo que pasa ahora (el más reciente si se solapan), lo siguiente y el tiempo libre", () => {
+  const eventos = [
+    ev("Oficina", "2026-10-27", "09:00", "18:00"),
+    ev("Reunión", "2026-10-27", "10:30", "11:30"),
+    ev("Foco", "2026-10-27", "12:00", "13:00", { libre: true }),
+    ev("Cena", "2026-10-27", "21:00", "22:00"),
+  ];
+  const a = zonedToUtc("2026-10-27", "10:40", TZ);
+  const s = situacion(construirDia("2026-10-27", eventos, AJUSTES_POR_DEFECTO, TZ, a), TZ, a);
+  assert.deepEqual(s.actual, { titulo: "Reunión", hasta: "11:30" });
+  assert.equal(s.libre, "3 h"); // 18:00–21:00 (22:00–22:30 no llega al mínimo de 45 min)
+  const b = zonedToUtc("2026-10-27", "18:30", TZ);
+  const t = situacion(construirDia("2026-10-27", eventos, AJUSTES_POR_DEFECTO, TZ, b), TZ, b);
+  assert.equal(t.actual, null);
+  assert.deepEqual(t.siguiente, { titulo: "Cena", hora: "21:00" });
+  assert.equal(t.libre, "2 h 30 min"); // 18:30–21:00
 });

@@ -229,3 +229,18 @@ export function tramoDelDia(e: Evento, diaIni: number, diaFin: number, tz: strin
   if (fin > diaFin) return `desde ${formatHora(ini, tz)}`;
   return `${formatHora(ini, tz)}–${formatHora(fin, tz)}`;
 }
+
+/** Lo que pasa ahora o lo siguiente, y el tiempo libre que queda en tu horario. */
+export function situacion(dia: Dia, tz: string, ahora: number) {
+  const ocupan = dia.eventos.filter((e) => !e.libre && !esVariosDias(e));
+  // Si hay varios en curso, el que empezó más tarde (p. ej. una reunión dentro de «Oficina»).
+  const actual = ocupan.filter((e) => (e.inicio as number) <= ahora && (e.fin as number) > ahora).at(-1) ?? null;
+  const siguiente = ocupan.find((e) => (e.inicio as number) > ahora) ?? null;
+  const libreMin = dia.huecos.reduce((s, h) => s + Math.max(0, h.fin - Math.max(h.ini, ahora)), 0) / 60000;
+  return {
+    actual: actual && { titulo: actual.titulo, hasta: (actual.fin as number) >= dia.fin ? null : formatHora(actual.fin as number, tz) },
+    siguiente: siguiente && { titulo: siguiente.titulo, hora: formatHora(siguiente.inicio as number, tz) },
+    libre: libreMin >= 1 ? formatDuracion(libreMin) : null,
+  };
+}
+

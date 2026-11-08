@@ -1,8 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
 
-// Marca de este dispositivo como «PC de Appliant». Es una preferencia por equipo (cookie httpOnly),
-// no un control de seguridad: el modo trabajo completo (finanzas bloqueadas en el servidor) es la fase 10.
+// Marca de este dispositivo como «PC de Appliant» (cookie httpOnly). Con ella el servidor no pide a
+// Mis tareas nada personal y no carga ni el resumen ni las finanzas (modo trabajo, fase 10).
 export const COOKIE_EQUIPO = "equipo";
 
 export async function esEquipoTrabajo(): Promise<boolean> {

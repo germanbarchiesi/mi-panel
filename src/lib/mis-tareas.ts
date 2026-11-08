@@ -284,6 +284,11 @@ export function ocupadoAEventos(o: Ocupado, tz: string): Evento[] {
   });
 }
 
+/** La tarea con la hora más temprana (la API no tiene por qué devolverlas ordenadas por hora). */
+export function primeraConHora<T extends { hora: string | null }>(tareas: T[]): T | null {
+  return tareas.filter((t) => t.hora).sort((a, b) => (a.hora as string).localeCompare(b.hora as string))[0] ?? null;
+}
+
 /** Párrafo de tareas para el resumen de las 7:00 (fase 9). Sin notas ni importes. */
 export function textoResumen(r: Resumen): string {
   const n = r.hoy.length;
@@ -292,7 +297,7 @@ export function textoResumen(r: Resumen): string {
   const frases: string[] = [];
   frases.push(n === 0 ? "Hoy no tienes tareas nuevas." : `Hoy tienes ${n} ${n === 1 ? "tarea" : "tareas"}.`);
 
-  const primera = r.hoy.find((t) => t.hora);
+  const primera = primeraConHora(r.hoy);
   if (primera) frases.push(`La primera con hora, a las ${primera.hora}: ${primera.titulo}.`);
 
   const a = r.arrastradas.length;

@@ -7,8 +7,9 @@ import { Icono } from "@/components/iconos";
 
 export type EstadoFinanzas =
   | { tipo: "modo_trabajo" }
+  | { tipo: "error" }
   | { tipo: "bloqueado"; hayHuella: boolean; faltaMigracion: boolean }
-  | { tipo: "abierto"; hasta: number; ocultos: boolean; r: ResultadoFinanzas };
+  | { tipo: "abierto"; hasta: number; restante: number; ocultos: boolean; r: ResultadoFinanzas };
 
 const EUR = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const EUR0 = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -201,11 +202,15 @@ function Contenido({ r, ocultos }: { r: ResultadoFinanzas; ocultos: boolean }) {
 }
 
 export function Finanzas({ e }: { e: EstadoFinanzas }) {
-  if (e.tipo === "modo_trabajo") {
+  if (e.tipo === "modo_trabajo" || e.tipo === "error") {
     return (
       <section className="modulo" aria-labelledby="finanzas-titulo">
         <h2 id="finanzas-titulo">Finanzas</h2>
-        <p className="vacio">No se cargan en el PC de trabajo.</p>
+        {e.tipo === "modo_trabajo" ? (
+          <p className="vacio">No se cargan en el PC de trabajo.</p>
+        ) : (
+          <p className="error">No se han podido cargar las finanzas ahora mismo. Vuelve a abrir el panel en un momento.</p>
+        )}
       </section>
     );
   }
@@ -236,7 +241,7 @@ export function Finanzas({ e }: { e: EstadoFinanzas }) {
   }
   return (
     <section className="modulo" aria-labelledby="finanzas-titulo">
-      <AutoBloqueo hasta={e.hasta} />
+      <AutoBloqueo hasta={e.hasta} restante={e.restante} />
       <div className="modulo-cabecera">
         <h2 id="finanzas-titulo">Finanzas</h2>
         <div className="acciones">

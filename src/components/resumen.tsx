@@ -54,6 +54,13 @@ function base64AUint8(b64: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+/** Registro del service worker; espera como mucho 5 s (si no hay ninguno, `ready` no termina nunca). */
+async function registro(): Promise<ServiceWorkerRegistration | null> {
+  const listo = navigator.serviceWorker.ready;
+  const tope = new Promise<null>((ok) => setTimeout(() => ok(null), 5000));
+  return Promise.race([listo, tope]);
+}
+
 /** Activa o quita las notificaciones en este dispositivo. */
 export function Notificaciones() {
   const [estado, setEstado] = useState<"cargando" | "no_soportado" | "denegado" | "activo" | "inactivo">("cargando");
@@ -70,7 +77,11 @@ export function Notificaciones() {
         setEstado("denegado");
         return;
       }
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await registro();
+      if (!reg) {
+        setEstado("no_soportado");
+        return;
+      }
       setEstado((await reg.pushManager.getSubscription()) ? "activo" : "inactivo");
     })().catch(() => setEstado("no_soportado"));
   }, []);
@@ -86,7 +97,8 @@ export function Notificaciones() {
       const r = await fetch("/api/push", { cache: "no-store" });
       const { clave } = await r.json();
       if (!r.ok || !clave) throw new Error("config");
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await registro();
+      if (!reg) throw new Error("sw");
       const sub =
         (await reg.pushManager.getSubscription()) ??
         (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64AUint8(clave) }));
@@ -108,8 +120,8 @@ export function Notificaciones() {
   }
 
   async function quitar() {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
+    const reg = await registro();
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
     if (sub) {
       await fetch("/api/push", {
         method: "DELETE",
@@ -164,23 +176,30 @@ export function Notificaciones() {
 }
 
 export function Copiar({ texto }: { texto: string }) {
-  const [ok, setOk] = useState(false);
+  const [estado, setEstado] = useState<"" | "ok" | "error">("");
   return (
-    <button
-      className="boton"
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(texto);
-          setOk(true);
-          setTimeout(() => setOk(false), 2000);
-        } catch {
-          setOk(false);
-        }
-      }}
-    >
-      <Icono nombre={ok ? "check" : "copiar"} tam={18} />
-      {ok ? "Copiada" : "Copiar la dirección"}
-    </button>
+    <>
+      <button
+        className="boton"
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(texto);
+            setEstado("ok");
+            setTimeout(() => setEstado(""), 2000);
+          } catch {
+            setEstado("error");
+          }
+        }}
+      >
+        <Icono nombre={estado === "ok" ? "check" : "copiar"} tam={18} />
+        {estado === "ok" ? "Copiada" : "Copiar la dirección"}
+      </button>
+      {estado === "error" && (
+        <span className="nota" role="status">
+          No se ha podido copiar: mantén pulsada la dirección para seleccionarla.
+        </span>
+      )}
+    </>
   );
 }

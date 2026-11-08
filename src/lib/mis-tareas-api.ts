@@ -84,9 +84,13 @@ async function pedir<T>(ruta: string, params: Record<string, string>, parsear: (
   })();
 
   cache.set(clave, { expira: ahora + TTL_OK, valor });
-  valor.then((r) => {
-    if (!r.ok) cache.set(clave, { expira: r.fallo === "limite" ? bloqueadoHasta : Date.now() + TTL_FALLO, valor });
-  });
+  valor.then(
+    (r) => {
+      if (!r.ok) cache.set(clave, { expira: r.fallo === "limite" ? bloqueadoHasta : Date.now() + TTL_FALLO, valor });
+    },
+    // Un fallo inesperado no se queda en la caché (y esta rama evita un rechazo sin capturar).
+    () => cache.delete(clave),
+  );
   for (const [k, v] of cache) if (v.expira <= ahora) cache.delete(k); // limpieza
   return valor;
 }

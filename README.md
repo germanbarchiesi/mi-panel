@@ -85,7 +85,7 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 
 ## Fase 9 · Resumen de las 7:00
 
-- **Cuándo:** Supabase Cron (migración 0007, `pg_cron` + `pg_net`) llama a `POST /api/resumen/tick` cada 30 min con `Authorization: Bearer CRON_SECRET` (el secreto vive en Supabase Vault). El código decide en la zona del usuario: de lunes a viernes, prepara desde las 6:30 y notifica desde las 7:00; si una llamada se pierde, la siguiente recupera (hasta las 10:00). Zona: Barcelona o, con «Usar la hora de donde estoy», la última que vio la app (`tzConocida`).
+- **Cuándo:** Supabase Cron (migraciones 0007 y 0008, `pg_cron` + `pg_net`) llama a `POST /api/resumen/tick` a los minutos 2, 7, 32 y 37 de cada hora (a :00 y :30 Vercel devolvía a veces un 500 antes de llegar a la app) con `Authorization: Bearer CRON_SECRET` (el secreto vive en Supabase Vault). Llamar de más es seguro: cada día se prepara y se avisa una sola vez. Ajustes avisa si la última llamada tiene más de 2 horas. El código decide en la zona del usuario: de lunes a viernes, prepara desde las 6:30 y notifica desde las 7:00; si una llamada se pierde, la siguiente recupera (hasta las 10:00). Zona: Barcelona o, con «Usar la hora de donde estoy», la última que vio la app (`tzConocida`).
 - **Qué dice** (`src/lib/resumen.ts`, plantilla sin IA ni importes): agenda y primer hueco, tareas por ámbito (primera con hora, arrastradas, prioridad alta, con quién te ves), vencimientos a 7 y 30 días, ritmo de gasto, pendientes, deporte del día, cartera en % y agentes con novedades. Si un módulo falla, se omite (Mis tareas lo dice).
 - **Dónde:** el texto se guarda **cifrado** en `resumenes` (migración 0006). Inicio: tarjeta «Resumen de hoy» con **Escuchar** (voz del propio dispositivo).
 - **Notificación** (Web Push): «Tu resumen está listo», sin contenido. Las claves VAPID las genera la app y las guarda cifradas en `claves_app`. Ajustes → «Activar notificaciones en este dispositivo».
@@ -103,7 +103,22 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 ## Fase 10 · Modo trabajo y emergencia
 
 - **PC de Appliant:** Ajustes → «Es el PC de Appliant» (cookie por dispositivo). En ese equipo el servidor no lee el Excel (ni Finanzas, ni Vencimientos, ni Inversiones), no muestra el resumen ni el informe privado de agentes, y Actividades queda fijo en **Trabajo** (sin selector; a Mis tareas solo se le pide ese ámbito, aunque se fuerce otro en la URL).
-- **Emergencia** (Ajustes, al final): revoca Google y Strava, borra sus tokens, quita las notificaciones, bloquea Finanzas y cierra la sesión en todos los dispositivos (`signOut` global). Pide escribir EMERGENCIA.
+- **Emergencia** (Ajustes, al final): revoca Google y Strava, borra sus tokens, quita las notificaciones, bloquea Finanzas y cierra la sesión en todos los dispositivos (`signOut` global). Pide escribir EMERGENCIA. «Salir» (arriba) cierra solo la sesión de ese dispositivo.
+
+## Diseño
+
+- **El día es una línea:** la «Línea del día» (`src/lib/linea.ts`, con tests) pinta el día como una banda horaria: lo ocupado con el color de su calendario (hasta tres carriles si se solapa), las tareas con hora, los huecos libres rayados y la marca amarilla de «ahora». Los próximos días la usan en pequeño.
+- **Amarillo = ahora:** solo el reloj, la marca de ahora y lo que pasa hoy usan el amarillo de los taxis.
+- **Chaflanes del Eixample:** los bloques tienen las esquinas en chaflán (`corner-shape: bevel`; donde no hay soporte, apenas redondeadas). La marca de la app es una manzana cruzada por la línea del día.
+- **Tipo:** Archivo variable (eje de anchura, servida desde la propia app): condensada para títulos y cifras, normal para leer. Modo claro y oscuro según el sistema; contraste AA comprobado con axe.
+- **Inicio:** en el móvil, Hoy → módulos → próximos días; en el PC, el día a la izquierda y los módulos en una o dos columnas.
+
+### Demostraciones con datos inventados
+
+Con `npm run dev` existen páginas que pintan la app sin Google, Supabase ni Mis tareas (ficheros `page.demo.tsx`, que el build de producción no incluye):
+
+- `/demo` (inicio), con variantes `?hora=10:40`, `?finanzas=bloqueado|sinhuella|ocultos|trabajo`, `?agenda=sin_conectar|reconectar|error`, `?tareas=fallo`, `?ambito=trabajo|personal|todo`.
+- `/demo/agentes` (`?estado=sin_drive|sin_carpeta|error`) y `/demo/ajustes` (`?aviso=ok|error`, `?sin=1`).
 
 ## Variables de entorno
 
@@ -182,7 +197,14 @@ src/lib/drive.ts           Drive con drive.file: metadatos y descarga
 src/lib/biometria.ts, firma.ts  desbloqueo con huella y fichas firmadas
 src/app/api/biometria      registro y desbloqueo WebAuthn
 src/app/api/drive/selector datos para el selector de Google
+src/lib/linea.ts           la Línea del día: tramos, carriles y huecos en horas de reloj (con tests)
+src/lib/feed-rss.ts        XML del feed privado (con tests)
+src/components/inicio.tsx  página de inicio (solo pinta; la carga está en app/page.tsx)
+src/components/ajustes-vista.tsx  página de ajustes (solo pinta; datos y acciones en app/ajustes)
+src/components/cabecera.tsx, iconos.tsx, reloj.tsx  cabecera común, iconos y marca, reloj y refresco
+src/components/agenda.tsx  Hoy, Línea del día, lista del día y próximos días
 src/components/actividades.tsx  módulo Actividades
+src/app/demo               demostraciones con datos inventados (solo `next dev`)
 src/app/auth/google/*      conectar, callback y desconectar de Calendar
 src/app/ajustes            página de ajustes
 src/lib/env.ts             variables de entorno y comprobación del propietario

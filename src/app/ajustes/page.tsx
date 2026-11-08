@@ -216,6 +216,10 @@ async function borrarHuella(formData: FormData) {
   redirect("/ajustes?ok=huella_borrada#huella");
 }
 
+function ahoraMs() {
+  return Date.now();
+}
+
 export default async function AjustesPage({
   searchParams,
 }: {
@@ -307,6 +311,7 @@ export default async function AjustesPage({
     resumen: {
       conClave,
       tick,
+      tickReciente: tick !== null && ahoraMs() - tick < 2 * 3600_000,
       cronSecret: !!cronSecret(),
       github: !!githubDispatch(),
       feedUrl: tokenDelFeed ? `${origen}/api/feed/${tokenDelFeed}` : null,

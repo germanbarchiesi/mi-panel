@@ -61,7 +61,7 @@ test("reparto por bolsa y clase, y desvío frente al objetivo con la banda", () 
   const etf = r.objetivos.find((o) => o.nombre === "ETF Mundo");
   assert.ok(Math.abs((etf?.peso ?? 0) - 0.6875) < 1e-9);
   assert.equal(etf?.fueraDeBanda, true);
-  assert.ok(r.alertas.some((a) => a.startsWith("ETF Mundo: -11.3 puntos")));
+  assert.ok(r.alertas.some((a) => a.startsWith("ETF Mundo: -11,3 puntos")));
 });
 
 test("rentabilidad del año desde la última foto del año anterior, y evolución mensual", () => {

@@ -123,7 +123,7 @@ export function componerResumen(d: DatosResumen): string {
         ...(personal ? [`${personal} ${personal === 1 ? "personal" : "personales"}`] : []),
       ];
       if (grupos.length) partes.push(`Tareas para hoy: ${lista(grupos)}.`);
-      const primera = t.hoy.find((x) => x.hora);
+      const primera = t.hoy.filter((x) => x.hora).sort((a, b) => (a.hora as string).localeCompare(b.hora as string))[0];
       if (primera) partes.push(`La primera con hora, a ${horaHablada(primera.hora as string)}: ${limpiar(primera.titulo)}.`);
       if (t.arrastradas) partes.push(`${t.arrastradas === 1 ? "Arrastras una tarea" : `Arrastras ${t.arrastradas} tareas`} de días anteriores.`);
       const altas = t.hoy.filter((x) => x.prioridad === "alta").map((x) => limpiar(x.titulo));

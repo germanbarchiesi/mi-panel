@@ -13,16 +13,20 @@
   --hundido: #e2e4de;
   --tinta: #18202b;
   --tinta-2: #4a5361;
-  --tinta-3: #6f7784;
+  --tinta-3: #5b6370;
   --regla: #d3d6cf;
   --ahora: #f5c400;
   --sobre-ahora: #241c00;
-  --libre: #2f7d57;
+  --libre: #2a7350;
   --tarea: #6a4c9c;
   --alerta: #b93a2e;
-  --atencion: #8a5f00;
+  --atencion: #7a5400;
   --foco: #1f5fd6;
   --sobre-tinta: #f9f9f6;
+  --sobre-alerta: #ffffff;
+  /* Texto sobre fondos teñidos (etiquetas): un punto más oscuro para mantener el contraste. */
+  --texto-alerta: #9a2c22;
+  --texto-libre: #236446;
 
   --fuente: "Archivo Variable", "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --estrecha: 74%;
@@ -52,6 +56,9 @@
     --atencion: #e0b13e;
     --foco: #86abff;
     --sobre-tinta: #111419;
+    --sobre-alerta: #111419;
+    --texto-alerta: #f07d70;
+    --texto-libre: #5fb88a;
     color-scheme: dark;
   }
 }
@@ -685,8 +692,15 @@ ol {
   color: var(--tinta-2);
 }
 
-.fila-pasada {
-  opacity: 0.55;
+/* Lo que ya ha pasado hoy, en segundo plano (sin opacidad: el texto sigue siendo legible). */
+.fila-pasada .fila-hora,
+.fila-pasada .fila-titulo {
+  color: var(--tinta-2);
+  font-weight: 450;
+}
+
+.fila-pasada .fila-marca {
+  opacity: 0.45;
 }
 
 .fila-hueco .fila-marca {
@@ -744,7 +758,7 @@ ol {
 
 .etiqueta-riesgo {
   background: color-mix(in srgb, var(--alerta) 14%, transparent);
-  color: var(--alerta);
+  color: var(--texto-alerta);
 }
 
 .etiqueta-atencion {
@@ -754,7 +768,7 @@ ol {
 
 .etiqueta-ok {
   background: color-mix(in srgb, var(--libre) 14%, transparent);
-  color: var(--libre);
+  color: var(--texto-libre);
 }
 
 .etiqueta-ahora {
@@ -978,7 +992,7 @@ ol {
 .boton-peligro {
   border-color: var(--alerta);
   background: var(--alerta);
-  color: #fff;
+  color: var(--sobre-alerta);
 }
 
 .boton-peligro:hover {
@@ -1739,6 +1753,11 @@ details.dia[open] > summary .dia-nombre {
 .ajustes {
   display: grid;
   gap: 28px;
+}
+
+/* Sin esto, el índice (una fila que se desplaza) ensancharía la columna en el móvil. */
+.ajustes > * {
+  min-width: 0;
 }
 
 @media (min-width: 960px) {

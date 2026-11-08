@@ -4,7 +4,17 @@ import { DIAS_FEED } from "@/lib/resumen-servicio";
 import { addDays, ymdInTz, TZ_BARCELONA } from "@/lib/agenda";
 
 // Feed de podcast privado para AntennaPod: los audios de los últimos 7 días.
-export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(request: Request, ctx: { params: Promise<{ token: string }> }) {
+  try {
+    return await feed(request, ctx);
+  } catch (e) {
+    // Supabase o la configuración fallan: AntennaPod lo vuelve a intentar en la siguiente actualización.
+    console.error("feed", e instanceof Error ? e.message : e);
+    return new Response("No disponible", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "600" } });
+  }
+}
+
+async function feed(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const token = (await params).token.replace(/\.xml$/, "");
   const userId = await comprobarFeed(token);
   if (!userId) return new Response("Not found", { status: 404 });

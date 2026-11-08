@@ -315,7 +315,7 @@ export function valorar(
   const alertas: string[] = [];
   for (const o of objetivos.filter((x) => x.fueraDeBanda)) {
     const pp = Math.round((o.desvio as number) * 1000) / 10;
-    alertas.push(`${o.nombre}: ${pp > 0 ? "+" : ""}${pp} puntos frente a tu objetivo`);
+    alertas.push(`${o.nombre}: ${pp > 0 ? "+" : ""}${String(pp).replace(".", ",")} puntos frente a tu objetivo`);
   }
   if (preciosDesdeExcel > 0) {
     alertas.push(`${preciosDesdeExcel} ${preciosDesdeExcel === 1 ? "activo valorado" : "activos valorados"} con el precio del Excel`);

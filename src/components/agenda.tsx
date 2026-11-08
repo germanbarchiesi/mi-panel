@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { esVariosDias, formatDuracion, formatHora, tramoDelDia, type Dia, type Evento } from "@/lib/agenda";
+import { esVariosDias, formatDuracion, formatHora, situacion, tramoDelDia, type Dia, type Evento } from "@/lib/agenda";
 import type { ResultadoAgenda } from "@/lib/agenda-loader";
 import { construirLinea, posicion } from "@/lib/linea";
 import { MENSAJES_FALLO } from "@/lib/mis-tareas";
@@ -282,19 +282,6 @@ export function ProximosDias({ dias, tz, ahora }: { dias: Dia[]; tz: string; aho
 }
 
 // --- Hoy (cabecera de la página de inicio) ------------------------------------------------------------
-
-/** Lo que pasa ahora o lo siguiente, y el tiempo libre que queda en tu horario. */
-export function situacion(dia: Dia, tz: string, ahora: number) {
-  const ocupan = dia.eventos.filter((e) => !e.libre && !esVariosDias(e));
-  const actual = ocupan.find((e) => (e.inicio as number) <= ahora && (e.fin as number) > ahora) ?? null;
-  const siguiente = ocupan.find((e) => (e.inicio as number) > ahora) ?? null;
-  const libreMin = dia.huecos.reduce((s, h) => s + Math.max(0, h.fin - Math.max(h.ini, ahora)), 0) / 60000;
-  return {
-    actual: actual && { titulo: actual.titulo, hasta: (actual.fin as number) >= dia.fin ? null : formatHora(actual.fin as number, tz) },
-    siguiente: siguiente && { titulo: siguiente.titulo, hora: formatHora(siguiente.inicio as number, tz) },
-    libre: libreMin >= 1 ? formatDuracion(libreMin) : null,
-  };
-}
 
 function Situacion({ dia, tz, ahora }: { dia: Dia; tz: string; ahora: number }) {
   const s = situacion(dia, tz, ahora);

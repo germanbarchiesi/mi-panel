@@ -1,4 +1,4 @@
--- Mi Panel · Fase 9 · Cron en minutos no redondos y con reintento.
+-- Mi Panel · Fase 9 · Cron en minutos no redondos y con reintento. Aplicada el 8 nov 2026.
 -- Motivo: varias llamadas a :00 y :30 recibieron un 500 de Vercel antes de llegar a la app.
 -- Es seguro llamar de más: el código solo prepara/notifica una vez por día.
 

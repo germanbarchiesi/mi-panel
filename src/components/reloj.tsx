@@ -44,26 +44,32 @@ export function MarcaAhora({
 
 /**
  * La app instalada se queda abierta en segundo plano: al volver a ella pasados unos minutos
- * (o al día siguiente) se piden los datos de nuevo, para no enseñar la agenda de ayer.
+ * (o al día siguiente) se piden los datos de nuevo, para no enseñar la agenda de ayer. Si se queda
+ * a la vista (el PC), se refresca sola cada `cada` minutos para que «ahora» y los huecos sigan al día.
  */
-export function Refrescar({ cargado, tz, minutos = 5 }: { cargado: number; tz: string; minutos?: number }) {
+export function Refrescar({ cargado, tz, minutos = 5, cada = 10 }: { cargado: number; tz: string; minutos?: number; cada?: number }) {
   const router = useRouter();
   useEffect(() => {
     let ultimo = cargado;
+    const refrescar = () => {
+      ultimo = Date.now();
+      router.refresh();
+    };
     const alVolver = () => {
       if (document.visibilityState !== "visible") return;
       const ahora = Date.now();
-      if (ahora - ultimo > minutos * 60_000 || ymdInTz(ahora, tz) !== ymdInTz(ultimo, tz)) {
-        ultimo = ahora;
-        router.refresh();
-      }
+      if (ahora - ultimo > minutos * 60_000 || ymdInTz(ahora, tz) !== ymdInTz(ultimo, tz)) refrescar();
     };
+    const periodico = setInterval(() => {
+      if (document.visibilityState === "visible" && Date.now() - ultimo >= cada * 60_000) refrescar();
+    }, 60_000);
     document.addEventListener("visibilitychange", alVolver);
     window.addEventListener("pageshow", alVolver);
     return () => {
+      clearInterval(periodico);
       document.removeEventListener("visibilitychange", alVolver);
       window.removeEventListener("pageshow", alVolver);
     };
-  }, [cargado, tz, minutos, router]);
+  }, [cargado, tz, minutos, cada, router]);
   return null;
 }

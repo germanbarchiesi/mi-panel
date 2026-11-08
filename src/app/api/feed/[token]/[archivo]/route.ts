@@ -2,7 +2,16 @@ import { admin } from "@/lib/admin";
 import { comprobarFeed } from "@/lib/feed";
 
 // Audio de un episodio del feed privado.
-export async function GET(_: Request, { params }: { params: Promise<{ token: string; archivo: string }> }) {
+export async function GET(request: Request, ctx: { params: Promise<{ token: string; archivo: string }> }) {
+  try {
+    return await audio(ctx);
+  } catch (e) {
+    console.error("feed audio", e instanceof Error ? e.message : e);
+    return new Response("No disponible", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "600" } });
+  }
+}
+
+async function audio({ params }: { params: Promise<{ token: string; archivo: string }> }) {
   const { token, archivo } = await params;
   const m = /^(\d{4}-\d{2}-\d{2})\.mp3$/.exec(archivo);
   const userId = m ? await comprobarFeed(token) : null;

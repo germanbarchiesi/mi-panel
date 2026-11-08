@@ -173,6 +173,7 @@ function finanzasDemo(variante: string | undefined): EstadoFinanzas {
   return {
     tipo: "abierto",
     hasta: ahoraMs() + 5 * 60_000,
+    restante: 5 * 60_000,
     ocultos: variante === "ocultos",
     r: {
       estado: "ok",
