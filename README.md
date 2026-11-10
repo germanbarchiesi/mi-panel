@@ -104,6 +104,7 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 
 - **PC de Appliant:** Ajustes → «Es el PC de Appliant» (cookie por dispositivo). En ese equipo el servidor no lee el Excel (ni Finanzas, ni Vencimientos, ni Inversiones), no muestra el resumen ni el informe privado de agentes, y Actividades queda fijo en **Trabajo** (sin selector; a Mis tareas solo se le pide ese ámbito, aunque se fuerce otro en la URL).
 - **Emergencia** (Ajustes, al final): revoca Google y Strava, borra sus tokens, quita las notificaciones, bloquea Finanzas y cierra la sesión en todos los dispositivos (`signOut` global). Pide escribir EMERGENCIA. «Salir» (arriba) cierra solo la sesión de ese dispositivo.
+- **Base de datos (migración 0009):** la función del disparador que impide otros registros ya no se puede llamar desde la API, e índice en `suscripciones_push`. El asesor de Supabase solo deja avisos esperados (RLS sin políticas en las tablas del servidor, `pg_net` en `public` y la protección de contraseñas, que no aplica con Google).
 
 ## Diseño
 
