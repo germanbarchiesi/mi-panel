@@ -262,6 +262,21 @@ export type Ritmo = {
   cierreEstimado: number;
 };
 
+/** «enero», «enero y marzo», «enero a octubre», «enero a marzo y mayo»: tramos seguidos de 3 o más con «a». */
+export function listaMeses(meses: number[]): string {
+  const orden = [...new Set(meses)].filter((m) => m >= 1 && m <= 12).sort((a, b) => a - b);
+  const nombre = (m: number) => MESES[m - 1].toLowerCase();
+  const partes: string[] = [];
+  for (let i = 0; i < orden.length; ) {
+    let j = i;
+    while (j + 1 < orden.length && orden[j + 1] === orden[j] + 1) j++;
+    if (j - i >= 2) partes.push(`${nombre(orden[i])} a ${nombre(orden[j])}`);
+    else for (let k = i; k <= j; k++) partes.push(nombre(orden[k]));
+    i = j + 1;
+  }
+  return partes.length <= 1 ? (partes[0] ?? "") : `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`;
+}
+
 export function diasDelMes(anio: number, mes: number): number {
   return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
 }
@@ -285,6 +300,8 @@ export type Resumen = {
   anterior: Mes | null;
   mediaCerrados: number | null;
   mesesCerrados: number;
+  /** Los meses cerrados con los que se calcula la media (1-12). */
+  cerrados: number[];
   ritmo: Ritmo | null;
   diaCorte: number;
   diasMes: number;
@@ -319,6 +336,7 @@ export function resumir(d: Datos, hoy: string): Resumen {
     anterior: mes > 1 ? meses[mes - 2] : null,
     mediaCerrados: media,
     mesesCerrados: cerrados.length,
+    cerrados: cerrados.map((m) => m.mes),
     ritmo: media !== null ? ritmo(actual.gastado, media, diaCorte, diasMes) : null,
     diaCorte,
     diasMes,

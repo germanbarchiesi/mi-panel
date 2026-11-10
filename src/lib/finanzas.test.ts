@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { leerLibro } from "./xlsx.ts";
-import { LECTURA, calcularMes, cerrado, datosDelLibro, mesActualDelLibro, resumir, ritmo } from "./finanzas.ts";
+import { LECTURA, calcularMes, cerrado, datosDelLibro, listaMeses, mesActualDelLibro, resumir, ritmo } from "./finanzas.ts";
 
 // Libro sintético con la estructura de la V6 (tblMovimientos, tblCuentas, Categorías, cfgAnio).
 // La comprobación contra el Excel real (10 meses, al céntimo) se hizo aparte: los datos reales no van al repo.
@@ -57,6 +57,7 @@ test("resumen: mes de la fecha de corte, media de cerrados, ritmo y cierre estim
   assert.equal(r.diaCorte, 12);
   assert.equal(r.diasMes, 31);
   assert.equal(r.mesesCerrados, 1);
+  assert.deepEqual(r.cerrados, [1]);
   assert.equal(r.mediaCerrados, 160.19);
   assert.equal(r.actual.gastado, 190);
   assert.equal(r.anterior?.gastado, 300);
@@ -77,4 +78,13 @@ test("umbrales del ritmo: +10 atención, más de +20 riesgo", () => {
   assert.equal(ritmo(710, 1000, 15, 30)?.estado, "riesgo"); // +21
   assert.equal(ritmo(100, 0, 15, 30), null);
   assert.equal(ritmo(100, 1000, 0, 30), null);
+});
+
+test("nombres de los meses cerrados: tramos seguidos con «a»", () => {
+  assert.equal(listaMeses([1]), "enero");
+  assert.equal(listaMeses([1, 2]), "enero y febrero");
+  assert.equal(listaMeses([3, 1]), "enero y marzo");
+  assert.equal(listaMeses([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), "enero a octubre");
+  assert.equal(listaMeses([1, 2, 3, 5, 9, 10]), "enero a marzo, mayo, septiembre y octubre");
+  assert.equal(listaMeses([]), "");
 });

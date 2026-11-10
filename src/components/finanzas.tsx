@@ -1,4 +1,4 @@
-import { MESES, type Resumen } from "@/lib/finanzas";
+import { MESES, listaMeses, type Resumen } from "@/lib/finanzas";
 import type { ResultadoFinanzas } from "@/lib/finanzas-loader";
 import { AutoBloqueo, BotonBloquear, BotonDesbloquear, BotonImportes } from "@/components/biometria";
 import { Vencimientos } from "@/components/vencimientos";
@@ -33,38 +33,63 @@ const ESTADO_RITMO = {
   riesgo: { texto: "En riesgo", clase: "etiqueta-riesgo" },
 };
 
-/** Lo gastado frente a tu media de meses cerrados, con la marca de dónde estarías a ritmo normal. */
+const QUE_ES_CERRADO = "Un mes cuenta como cerrado cuando ya ha terminado y no le quedan movimientos sin clasificar.";
+
+/**
+ * Lo gastado este mes frente a tu gasto medio de los meses cerrados del año, con la marca de lo habitual
+ * a la fecha de corte. Dice siempre con qué se compara.
+ */
 function Ritmo({ r, ocultos }: { r: Resumen; ocultos: boolean }) {
   const media = r.mediaCerrados;
-  if (!r.ritmo || media === null) {
+  if (media === null || !r.ritmo) {
     return (
-      <p className="nota">
-        {media === null ? "Aún no hay meses cerrados con los que comparar el ritmo de gasto." : "Sin movimientos importados este mes."}
-      </p>
+      <div className="ritmo">
+        <h3 className="ritmo-titular">Ritmo de gasto</h3>
+        <p className="nota">
+          {media === null
+            ? `Se compara con tu gasto medio de los meses cerrados de ${r.anio}, y aún no hay ninguno. ${QUE_ES_CERRADO}`
+            : "Sin movimientos importados este mes: todavía no hay ritmo que comparar."}
+        </p>
+      </div>
     );
   }
   const llevado = r.actual.gastado / media;
   const esperado = r.diasMes > 0 ? r.diaCorte / r.diasMes : 0;
   const escala = Math.max(1, llevado);
   const desvio = Math.round(r.ritmo.desvio);
+  const estado = r.ritmo.estado;
+  const diferencia =
+    desvio > 0 ? `${desvio} puntos por encima` : desvio < 0 ? `${-desvio} puntos por debajo` : "justo a tu ritmo habitual";
   return (
     <div className="ritmo">
       <h3 className="ritmo-titular">
         Ritmo de gasto
-        <span className={`etiqueta ${ESTADO_RITMO[r.ritmo.estado].clase}`}>{ESTADO_RITMO[r.ritmo.estado].texto}</span>
+        <span className={`etiqueta ${ESTADO_RITMO[estado].clase}`}>{ESTADO_RITMO[estado].texto}</span>
       </h3>
       <div
         className="medidor"
         role="img"
         aria-label={`Llevas el ${PCT.format(llevado)} de tu gasto medio; a día ${r.diaCorte} lo habitual sería el ${PCT.format(esperado)}.`}
       >
-        <span className={`medidor-valor ${r.ritmo.estado}`} style={{ width: `${Math.min(100, (llevado / escala) * 100)}%` }} />
+        <span className={`medidor-valor ${estado}`} style={{ width: `${Math.min(100, (llevado / escala) * 100)}%` }} />
         <span className="medidor-media" style={{ left: `${Math.min(100, (esperado / escala) * 100)}%` }} />
       </div>
+      <ul className="leyenda" aria-hidden="true">
+        <li>
+          <span className={`muestra muestra-gasto ${estado}`} /> Lo que llevas
+        </li>
+        <li>
+          <span className="muestra muestra-media" /> Lo habitual a día {r.diaCorte}
+        </li>
+      </ul>
       <p className="nota">
-        Llevas el {PCT.format(llevado)} de tu gasto medio y vas por el día {r.diaCorte} de {r.diasMes} (
-        {desvio > 0 ? `+${desvio}` : desvio} puntos). Cierre estimado: {importe(r.ritmo.cierreEstimado, ocultos, true)}, frente a una media
-        de {importe(media, ocultos, true)} en {r.mesesCerrados} {r.mesesCerrados === 1 ? "mes cerrado" : "meses cerrados"}.
+        <strong>Comparado con</strong> tu gasto medio de los meses cerrados de {r.anio} ({listaMeses(r.cerrados)}):{" "}
+        {importe(media, ocultos, true)} al mes. {QUE_ES_CERRADO}
+      </p>
+      <p className="nota">
+        Con datos hasta el día {r.diaCorte} de {r.diasMes} (el {PCT.format(esperado)} del mes) llevas el {PCT.format(llevado)} de esa media:{" "}
+        {diferencia}. «Atención» a partir de 10 puntos por encima y «En riesgo» con más de 20. Si sigues así,{" "}
+        {MESES[r.mes - 1].toLowerCase()} cerrará en unos {importe(r.ritmo.cierreEstimado, ocultos, true)}.
       </p>
     </div>
   );

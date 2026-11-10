@@ -1446,6 +1446,40 @@ details.dia[open] > summary .dia-nombre {
   background: var(--tinta);
 }
 
+/* Leyenda del medidor: la barra (lo que llevas) y la marca (lo habitual a la fecha de corte). */
+.ritmo .leyenda {
+  margin-top: 2px;
+}
+
+.muestra-gasto {
+  height: 8px;
+  background: var(--tinta-2);
+}
+
+.muestra-gasto.bien {
+  background: var(--libre);
+}
+
+.muestra-gasto.atencion {
+  background: var(--atencion);
+}
+
+.muestra-gasto.riesgo {
+  background: var(--alerta);
+}
+
+.muestra-media {
+  width: 2px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--tinta);
+}
+
+.nota strong {
+  color: var(--tinta);
+  font-weight: 650;
+}
+
 .reparto {
   list-style: none;
   display: grid;
