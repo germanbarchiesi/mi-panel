@@ -70,7 +70,7 @@ function agendaDemo(hoy: string, ahora: number, variante?: string): ResultadoAge
   return { estado: "ok", tz: TZ, dias, calendarios: ["Personal", "Familia", "Germán y Laura"], fallidos: [], tareas: "ok" };
 }
 
-function deporteDemo(hoy: string) {
+function deporteDemo(hoy: string, variante?: string) {
   const lunes = lunesDe(hoy);
   const d = (n: number) => addDays(lunes, n);
   const planificados: Planificado[] = [
@@ -83,9 +83,14 @@ function deporteDemo(hoy: string) {
   const hechos: Hecho[] = [
     { id: "1", fecha: d(0), hora: "20:41", nombre: "Natación de tarde", sportType: "Swim", minutos: 48, metros: 1850 },
     { id: "2", fecha: d(1), hora: "20:05", nombre: "WOD", sportType: "WeightTraining", minutos: 62, metros: 0 },
-    { id: "3", fecha: d(4), hora: "19:10", nombre: "Fuerza", sportType: "WeightTraining", minutos: 45, metros: 0 },
+    { id: "3", fecha: d(4), hora: "19:10", nombre: "Fuerza", sportType: "WeightTraining", minutos: 45, metros: 0, manual: true },
   ].filter((h) => h.fecha <= hoy);
-  return { semana: construirSemana(planificados, hechos, hoy), strava: "ok" as const, calendario: "ok" as const };
+  return {
+    semana: construirSemana(planificados, hechos, hoy),
+    strava: "ok" as const,
+    calendario: "ok" as const,
+    escribir: variante !== "sinpermiso",
+  };
 }
 
 function tareasDemo(hoy: string) {
@@ -192,7 +197,7 @@ function ahoraMs() {
 export default async function Demo({
   searchParams,
 }: {
-  searchParams: Promise<{ hora?: string; finanzas?: string; agenda?: string; tareas?: string; ambito?: string }>;
+  searchParams: Promise<{ hora?: string; finanzas?: string; agenda?: string; tareas?: string; ambito?: string; deporte?: string }>;
 }) {
   const sp = await searchParams;
   const real = ahoraMs();
@@ -218,7 +223,7 @@ export default async function Demo({
         urlApp: "https://mis-tareas.example.com",
         modoTrabajo: trabajo,
       }}
-      deporte={deporteDemo(hoy)}
+      deporte={deporteDemo(hoy, sp.deporte)}
       finanzas={finanzasDemo(sp.finanzas)}
       agentes={agentesDemo(ahora)}
       resumen7={

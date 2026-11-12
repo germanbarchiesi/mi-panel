@@ -37,7 +37,10 @@ export default function PrivacidadPage() {
 
         <h2>Otros servicios</h2>
         <ul>
-          <li>Strava, solo lectura de actividades, para comparar el deporte planificado con el hecho.</li>
+          <li>
+            Strava, para leer las actividades y comparar el deporte planificado con el hecho. Si el propietario lo permite, la app
+            también crea en Strava los entrenos que él apunta a mano; nunca cambia ni borra actividades.
+          </li>
           <li>Mis tareas, la app de tareas del propio titular, mediante su API de solo lectura.</li>
           <li>Yahoo Finanzas y Kraken, para precios públicos de mercado. No se les envía ningún dato personal.</li>
         </ul>

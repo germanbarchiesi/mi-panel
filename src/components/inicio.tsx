@@ -1,3 +1,4 @@
+import { formatHora } from "@/lib/agenda";
 import type { ResultadoAgenda } from "@/lib/agenda-loader";
 import type { ResultadoAgentes } from "@/lib/agentes-loader";
 import type { ResultadoDeporte } from "@/lib/deporte-loader";
@@ -65,7 +66,7 @@ export function Inicio(d: DatosInicio) {
                 modoTrabajo={d.actividades.modoTrabajo}
               />
             )}
-            {d.deporte && <Deporte r={d.deporte} />}
+            {d.deporte && <Deporte r={d.deporte} ahora={formatHora(d.ahora, d.tz)} />}
           </div>
           {d.finanzas && (
             <div className="columna">

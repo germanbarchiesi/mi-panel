@@ -1,6 +1,7 @@
-import type { DiaDeporte, EstadoPlan, Hecho } from "@/lib/deporte";
+import { diasParaApuntar, type DiaDeporte, type EstadoPlan, type Hecho } from "@/lib/deporte";
 import type { ResultadoDeporte } from "@/lib/deporte-loader";
 import { Icono } from "@/components/iconos";
+import { ApuntarEntreno } from "@/components/apuntar-entreno";
 
 const LETRA = ["L", "M", "X", "J", "V", "S", "D"];
 const NOMBRE = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -27,6 +28,7 @@ function km(metros: number, decimales = 1) {
 function detalle(h: Hecho) {
   const partes = [`${Math.round(h.minutos)} min`];
   if (h.sportType === "Swim" && h.metros > 0) partes.push(km(h.metros, 2));
+  if (h.manual) partes.push("apuntado a mano");
   return partes.join(", ");
 }
 
@@ -96,7 +98,35 @@ const MENSAJE_STRAVA: Record<string, string> = {
   error: "Strava no responde ahora mismo.",
 };
 
-export function Deporte({ r }: { r: ResultadoDeporte }) {
+/** «Apuntar un entreno a mano»: se crea en Strava, de donde el panel lee lo hecho. */
+function Apuntar({ r, ahora }: { r: ResultadoDeporte; ahora: string }) {
+  const hoy = r.semana.dias.find((d) => d.esHoy)?.fecha;
+  if (!hoy) return null;
+  const { opciones, elegido } = diasParaApuntar(r.semana, hoy, ahora);
+  return (
+    <details className="desplegable">
+      <summary>Apuntar un entreno a mano</summary>
+      {r.escribir ? (
+        <>
+          <p className="nota">Para cuando no llevabas el reloj. Se guarda en Strava como actividad manual.</p>
+          <ApuntarEntreno opciones={opciones} elegido={elegido} />
+        </>
+      ) : (
+        <div className="estado">
+          <p className="nota">
+            Para apuntar entrenos, Mi Panel necesita permiso para subir actividades a Strava. Solo creará los que apuntes aquí.
+          </p>
+          <a className="boton boton-primario" href="/auth/strava/conectar">
+            Dar permiso en Strava
+          </a>
+        </div>
+      )}
+    </details>
+  );
+}
+
+/** `ahora`: hora actual («HH:MM») en la zona del panel, para proponer qué apuntar. */
+export function Deporte({ r, ahora }: { r: ResultadoDeporte; ahora: string }) {
   const s = r.semana;
   const conAlgo = s.dias.map((d, i) => ({ d, i })).filter(({ d }) => d.plan.length > 0 || d.extras.length > 0);
   return (
@@ -160,6 +190,8 @@ export function Deporte({ r }: { r: ResultadoDeporte }) {
           <span>No se ha podido leer el calendario «Deporte».</span>
         </p>
       )}
+
+      {r.strava === "ok" && <Apuntar r={r} ahora={ahora} />}
 
       {conAlgo.length > 0 && (
         <details className="desplegable">

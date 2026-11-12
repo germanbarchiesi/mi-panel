@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isOwner, stravaConfig } from "@/lib/env";
 import { SCOPE_STRAVA } from "@/lib/strava";
 
-// Inicia la conexión con Strava (solo lectura de actividades), con «state» contra CSRF.
+// Inicia la conexión con Strava (leer actividades y crear entrenos manuales), con «state» contra CSRF.
 export async function GET(request: Request) {
   const { origin } = new URL(request.url);
   const supabase = await createClient();
@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     client_id: cfg.clientId,
     redirect_uri: `${origin}/auth/strava/callback`,
     response_type: "code",
-    approval_prompt: "auto",
+    // «force»: Strava enseña siempre la pantalla de permisos (también al pedir el de escritura nuevo).
+    approval_prompt: "force",
     scope: SCOPE_STRAVA,
     state,
   });

@@ -1310,6 +1310,56 @@ details.dia[open] > summary .dia-nombre {
   box-shadow: inset 0 0 0 1.5px var(--tinta-3);
 }
 
+/* Formulario «Apuntar un entreno a mano». */
+.apuntar {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.apuntar .campos {
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+}
+
+.campo-grupo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.campo-grupo > legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 0.9375rem;
+  font-weight: 550;
+}
+
+.segmento {
+  cursor: pointer;
+}
+
+.segmento:has(input:focus-visible) {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--regla);
+  border-radius: var(--chaflan-boton);
+  corner-shape: bevel;
+  background: var(--papel);
+  color: var(--tinta);
+  font: inherit;
+}
+
+select:hover {
+  border-color: var(--tinta-3);
+}
+
 .dep-item {
   display: flex;
   flex-direction: column;

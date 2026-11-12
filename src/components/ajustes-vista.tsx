@@ -27,7 +27,8 @@ export type DatosAjustes = {
     puedeRegistrar: boolean;
     minutos: number;
   };
-  strava: { configurado: boolean; estado: "conectado" | "sin_conectar" | "falta_migracion" };
+  /** `escribir`: Strava dio permiso para crear actividades (apuntar entrenos a mano). */
+  strava: { configurado: boolean; estado: "conectado" | "sin_conectar" | "falta_migracion"; escribir: boolean };
   resumen: {
     conClave: boolean;
     tick: number | null;
@@ -138,8 +139,17 @@ export function AjustesVista({ d, a }: { d: DatosAjustes; a: AccionesAjustes }) 
               ) : (
                 <>
                   <Conexion ok={d.strava.estado === "conectado"}>
-                    {d.strava.estado === "conectado" ? "Conectado, solo lectura de actividades" : "No conectado"}
+                    {d.strava.estado !== "conectado"
+                      ? "No conectado"
+                      : d.strava.escribir
+                        ? "Conectado: lee tus actividades y sube los entrenos que apuntes a mano"
+                        : "Conectado, solo lectura de actividades"}
                   </Conexion>
+                  {d.strava.estado === "conectado" && !d.strava.escribir && (
+                    <p className="nota">
+                      Para apuntar entrenos a mano desde el panel, pulsa «Reconectar» y deja marcado «subir actividades» en Strava.
+                    </p>
+                  )}
                   <div className="acciones">
                     <a className={d.strava.estado === "conectado" ? "boton" : "boton boton-primario"} href="/auth/strava/conectar">
                       {d.strava.estado === "conectado" ? "Reconectar" : "Conectar Strava"}
@@ -156,7 +166,7 @@ export function AjustesVista({ d, a }: { d: DatosAjustes; a: AccionesAjustes }) 
               )}
               <p className="modulo-pie">
                 Lo planificado sale del calendario de Google «Deporte». Natación cuenta como natación; fuerza y CrossFit, juntos. Las
-                actividades no se guardan.
+                actividades no se guardan en Mi Panel: las que apuntas a mano se crean en Strava, y desde Strava se editan o borran.
               </p>
             </div>
 

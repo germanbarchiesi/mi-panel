@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { timingSafeEqual } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { isOwner } from "@/lib/env";
-import { SCOPE_STRAVA, StravaReconectar, canjear, guardarConexion, olvidarStrava } from "@/lib/strava";
+import { StravaReconectar, canjear, guardarConexion, olvidarStrava, permisosStrava } from "@/lib/strava";
 
 function iguales(a: string, b: string) {
   const x = Buffer.from(a);
@@ -32,9 +32,10 @@ export async function GET(request: Request) {
   const guardado = (await cookies()).get("s_oauth")?.value;
   if (!code || !state || !guardado || !iguales(guardado, state)) return fallo("estado");
 
-  // El usuario puede desmarcar «ver actividades» en la pantalla de Strava: se exige.
+  // En la pantalla de Strava se pueden desmarcar permisos: «ver actividades» se exige; «subir actividades»
+  // es opcional (sin él, el panel lee pero no deja apuntar entrenos a mano).
   const scopes = url.searchParams.get("scope") ?? "";
-  if (!scopes.split(",").some((s) => s === SCOPE_STRAVA || s === "activity:read")) return fallo("strava_permiso");
+  if (!permisosStrava(scopes).leer) return fallo("strava_permiso");
 
   try {
     const t = await canjear({ code, grant_type: "authorization_code" });

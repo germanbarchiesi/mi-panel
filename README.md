@@ -65,8 +65,9 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 
 ## Fase 7 · Deporte
 
-- **Semana de lunes a domingo:** lo planificado sale del calendario de Google **«Deporte»** (por nombre, aunque no esté marcado en la Agenda); lo hecho, de **Strava** (`activity:read_all`, solo lectura).
+- **Semana de lunes a domingo:** lo planificado sale del calendario de Google **«Deporte»** (por nombre, aunque no esté marcado en la Agenda); lo hecho, de **Strava** (`activity:read_all`).
 - **Emparejado** (`src/lib/deporte.ts`): cada sesión planificada se marca hecha si ese día hay una actividad del mismo tipo. Natación = `Swim`; fuerza y CrossFit van juntos (`WeightTraining`, `Crossfit`, `Workout`, HIIT). Los paseos no cuentan. Estados: hecho, no hecho, pendiente hoy, planificado, y extra (hecho sin plan).
+- **Apuntar a mano** (desplegable del módulo): para un entreno sin reloj. Crea una **actividad manual en Strava** (`POST /activities`, permiso `activity:write`, opcional al conectar) con día (hasta 6 días atrás), tipo (natación `Swim`, CrossFit `Crossfit`, fuerza `WeightTraining`), hora, duración y, en natación, metros. Propone el día, tipo y hora de la última sesión planificada sin hacer. Si ese día ya hay en Strava una actividad del mismo tipo, pide confirmación. Mi Panel no guarda nada: se edita o borra desde Strava.
 - **Strava** (`src/lib/strava.ts`): OAuth con `state`; el refresh token se guarda **cifrado** (migración 0005) y se vuelve a guardar si Strava lo rota. Actividades en memoria 10 min; no se guardan. Desconectar revoca el permiso en Strava.
 
 ### Puesta en marcha de la fase 7
@@ -74,7 +75,7 @@ PWA personal (Next.js 16 + Supabase + Vercel). Plan técnico completo en el docu
 1. **Strava → strava.com/settings/api:** crear la app (nombre «Mi Panel», web `https://<tu-app>.vercel.app`, **Authorization Callback Domain** = `<tu-app>.vercel.app`).
 2. **Vercel:** `STRAVA_CLIENT_ID` y `STRAVA_CLIENT_SECRET`; redeploy.
 3. **Supabase → SQL Editor:** `supabase/migrations/0005_strava.sql`.
-4. **App → Ajustes → Conectar Strava.** **Google Calendar:** crear el calendario «Deporte».
+4. **App → Ajustes → Conectar Strava** (deja marcado «subir actividades» para poder apuntar entrenos a mano). **Google Calendar:** crear el calendario «Deporte».
 
 ## Fase 8 · Agentes
 
@@ -185,8 +186,10 @@ src/lib/vencimientos.ts    Previsión + cargos repetidos detectados (con tests)
 src/lib/inversiones.ts     posiciones, reparto, objetivos y evolución (con tests)
 src/lib/precios.ts         cotizaciones de Yahoo y Kraken (con tests)
 src/lib/fotos-cartera.ts   foto diaria cifrada de la cartera
-src/lib/deporte.ts         semana planificada frente a hecha (con tests)
-src/lib/strava.ts          Strava: token cifrado, actividades
+src/lib/deporte.ts         semana planificada frente a hecha y entreno a mano (con tests)
+src/lib/strava.ts          Strava: token cifrado, actividades, crear entreno manual
+src/lib/acciones-deporte.ts  acción «Apuntar un entreno a mano» (solo servidor)
+src/components/apuntar-entreno.tsx  formulario del entreno a mano
 src/app/auth/strava/*      conectar, callback y desconectar de Strava
 src/lib/agentes.ts         lista de agentes, lectura del resultado, próxima ejecución (con tests)
 src/app/agentes            solapa de agentes

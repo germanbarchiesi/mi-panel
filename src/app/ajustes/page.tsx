@@ -23,7 +23,7 @@ import {
   type Credencial,
 } from "@/lib/biometria";
 import { pickerConfig, stravaConfig } from "@/lib/env";
-import { StravaReconectar, leerConexion } from "@/lib/strava";
+import { StravaReconectar, leerPermisos } from "@/lib/strava";
 import { cronSecret, githubDispatch, supabaseSecretKey } from "@/lib/env";
 import { crearFeed, tokenFeed } from "@/lib/feed";
 import { prepararAhora, ultimoTick, zonaResumen } from "@/lib/resumen-servicio";
@@ -248,8 +248,11 @@ export default async function AjustesPage({
     faltaMigracionHuella = e instanceof FaltaMigracionBiometria;
   }
   let strava: "conectado" | "sin_conectar" | "falta_migracion" = "sin_conectar";
+  let stravaEscribir = false;
   try {
-    strava = (await leerConexion(supabase, user.id)) ? "conectado" : "sin_conectar";
+    const permisos = await leerPermisos(supabase, user.id);
+    strava = permisos ? "conectado" : "sin_conectar";
+    stravaEscribir = !!permisos?.escribir;
   } catch (e) {
     if (e instanceof StravaReconectar && e.motivo === "falta_migracion") strava = "falta_migracion";
   }
@@ -307,7 +310,7 @@ export default async function AjustesPage({
       puedeRegistrar: loginReciente(user),
       minutos: LOGIN_RECIENTE / 60000,
     },
-    strava: { configurado: !!stravaConfig(), estado: strava },
+    strava: { configurado: !!stravaConfig(), estado: strava, escribir: stravaEscribir },
     resumen: {
       conClave,
       tick,

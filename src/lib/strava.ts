@@ -4,14 +4,33 @@ import { cifrar, descifrar } from "@/lib/cripto";
 import { stravaConfig } from "@/lib/env";
 import { leerActividad, type Hecho } from "@/lib/deporte";
 
-// Strava con permiso de solo lectura de actividades. El refresh token se guarda cifrado y Strava
-// puede cambiarlo en cada renovación: se vuelve a guardar si cambia.
+// Strava: lectura de actividades y, solo cuando se pide desde el panel, creación de un entreno manual.
+// El refresh token se guarda cifrado y Strava puede cambiarlo en cada renovación: se vuelve a guardar si cambia.
 
-export const SCOPE_STRAVA = "activity:read_all";
+export const SCOPE_LECTURA = "activity:read_all";
+export const SCOPE_ESCRITURA = "activity:write";
+export const SCOPE_STRAVA = `${SCOPE_LECTURA},${SCOPE_ESCRITURA}`;
+
+/** Strava devuelve los permisos concedidos separados por comas (p. ej. «read,activity:read_all»). */
+export function permisosStrava(scopes: string) {
+  const lista = scopes.split(",").map((s) => s.trim());
+  return { leer: lista.includes(SCOPE_LECTURA) || lista.includes("activity:read"), escribir: lista.includes(SCOPE_ESCRITURA) };
+}
 
 export class StravaReconectar extends Error {
   constructor(public motivo: "sin_conectar" | "revocado" | "sin_configurar" | "falta_migracion") {
     super(motivo);
+  }
+}
+
+/** Crear una actividad necesita el permiso de escritura (o Strava lo ha retirado). */
+export class StravaSinEscritura extends Error {}
+/** Strava limita las peticiones por cuarto de hora y por día. */
+export class StravaLimite extends Error {}
+/** Strava ha rechazado los datos (4xx): no se ha creado nada. */
+export class StravaRechazo extends Error {
+  constructor(public status: number) {
+    super(`Strava ${status}`);
   }
 }
 
@@ -21,6 +40,10 @@ const actividades = new Map<string, { expira: number; datos: Hecho[] }>();
 
 export function olvidarStrava(userId: string) {
   tokens.delete(userId);
+  olvidarActividades(userId);
+}
+
+function olvidarActividades(userId: string) {
   for (const k of actividades.keys()) if (k.startsWith(`${userId}|`)) actividades.delete(k);
 }
 
@@ -62,6 +85,16 @@ export async function leerConexion(supabase: SupabaseClient, userId: string) {
   return { refresh: descifrar(data.refresh_token_cifrado, aad(userId)), scopes: data.scopes as string };
 }
 
+/** Permisos concedidos (sin descifrar el token). null si Strava no está conectado. */
+export async function leerPermisos(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase.from("conexiones_strava").select("scopes").eq("user_id", userId).maybeSingle();
+  if (error) {
+    if (error.code === "42P01" || error.code === "PGRST205") throw new StravaReconectar("falta_migracion");
+    throw new Error(`Supabase: ${error.message}`);
+  }
+  return data ? permisosStrava(String(data.scopes ?? "")) : null;
+}
+
 async function accessToken(supabase: SupabaseClient, userId: string): Promise<string> {
   const hit = tokens.get(userId);
   if (hit && hit.caduca > Date.now() + 120_000) return hit.token;
@@ -74,16 +107,17 @@ async function accessToken(supabase: SupabaseClient, userId: string): Promise<st
   return t.access_token;
 }
 
-/** Actividades entre dos instantes (s UTC), con 10 minutos de caché. No se guardan. */
+/** Actividades entre dos instantes (s UTC), con 10 minutos de caché (`fresco`: sin usarla). No se guardan. */
 export async function listarActividades(
   supabase: SupabaseClient,
   userId: string,
   desdeS: number,
   hastaS: number,
+  { fresco = false } = {},
 ): Promise<Hecho[]> {
   const clave = `${userId}|${desdeS}|${hastaS}`;
   const hit = actividades.get(clave);
-  if (hit && hit.expira > Date.now()) return hit.datos;
+  if (!fresco && hit && hit.expira > Date.now()) return hit.datos;
   const token = await accessToken(supabase, userId);
   const res = await fetch(
     `https://www.strava.com/api/v3/athlete/activities?${new URLSearchParams({
@@ -102,6 +136,34 @@ export async function listarActividades(
   const datos = (Array.isArray(lista) ? lista : []).map(leerActividad).filter((x): x is Hecho => x !== null);
   actividades.set(clave, { expira: Date.now() + 10 * 60_000, datos });
   return datos;
+}
+
+/**
+ * Crea un entreno manual (POST /activities). Devuelve su id. La caché se vacía pase lo que pase: aunque
+ * no llegue la respuesta, puede haberse creado, y así aparece enseguida.
+ */
+export async function crearActividad(supabase: SupabaseClient, userId: string, cuerpo: Record<string, string>): Promise<string> {
+  const token = await accessToken(supabase, userId);
+  try {
+    const res = await fetch("https://www.strava.com/api/v3/activities", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(cuerpo),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 401 || res.status === 403) {
+      tokens.delete(userId);
+      throw new StravaSinEscritura();
+    }
+    if (res.status === 429) throw new StravaLimite();
+    if (res.status >= 400 && res.status < 500) throw new StravaRechazo(res.status);
+    if (!res.ok) throw new Error(`Strava ${res.status}`);
+    const a = (await res.json().catch(() => null)) as { id?: number | string } | null;
+    return a?.id !== undefined ? String(a.id) : "";
+  } finally {
+    olvidarActividades(userId);
+  }
 }
 
 /** Revoca el permiso en Strava (si se puede) y borra el token guardado. */

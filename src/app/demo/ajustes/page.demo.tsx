@@ -45,7 +45,7 @@ export default async function DemoAjustes({ searchParams }: { searchParams: Prom
           puedeRegistrar: sin,
           minutos: 10,
         },
-        strava: { configurado: true, estado: sin ? "sin_conectar" : "conectado" },
+        strava: { configurado: true, estado: sin ? "sin_conectar" : "conectado", escribir: false },
         resumen: {
           conClave: true,
           tick: sin ? null : ahora - 9 * 60_000,

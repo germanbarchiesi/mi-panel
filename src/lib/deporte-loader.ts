@@ -4,14 +4,20 @@ import { addDays, formatHora, ymdInTz, zonedToUtc } from "@/lib/agenda";
 import { listarCalendarios, listarEventos } from "@/lib/calendar";
 import { GoogleReconectar, accessToken } from "@/lib/google";
 import { construirSemana, lunesDe, type Planificado, type Semana } from "@/lib/deporte";
-import { StravaReconectar, listarActividades } from "@/lib/strava";
+import { StravaReconectar, leerPermisos, listarActividades } from "@/lib/strava";
 
 // Semana planificada (calendario «Deporte» de Google) frente a la hecha (Strava). Nada se guarda.
 
 export type EstadoStrava = "ok" | StravaReconectar["motivo"] | "error";
 export type EstadoCalendario = "ok" | "sin_calendario" | "sin_google" | "error";
 
-export type ResultadoDeporte = { semana: Semana; strava: EstadoStrava; calendario: EstadoCalendario };
+export type ResultadoDeporte = {
+  semana: Semana;
+  strava: EstadoStrava;
+  calendario: EstadoCalendario;
+  /** Strava dio permiso para crear actividades (apuntar entrenos a mano). */
+  escribir: boolean;
+};
 
 const ES_DEPORTE = /^deporte$/i;
 
@@ -30,7 +36,13 @@ export async function cargarDeporte(supabase: SupabaseClient, userId: string, tz
         if (e.todoElDia && e.diaIni && e.diaFin) {
           for (let d = e.diaIni; d < e.diaFin; d = addDays(d, 1)) lista.push({ fecha: d, hora: null, titulo: e.titulo });
         } else if (e.inicio !== undefined) {
-          lista.push({ fecha: ymdInTz(e.inicio, tz), hora: formatHora(e.inicio, tz), titulo: e.titulo });
+          const minutos = e.fin !== undefined ? Math.round((e.fin - e.inicio) / 60_000) : 0;
+          lista.push({
+            fecha: ymdInTz(e.inicio, tz),
+            hora: formatHora(e.inicio, tz),
+            titulo: e.titulo,
+            ...(minutos >= 1 && minutos <= 600 ? { minutos } : {}),
+          });
         }
       }
       return { estado: "ok", lista };
@@ -47,6 +59,10 @@ export async function cargarDeporte(supabase: SupabaseClient, userId: string, tz
     }
   })();
 
-  const [p, h] = await Promise.all([plan, hechos]);
-  return { semana: construirSemana(p.lista, h.lista, hoy), strava: h.estado, calendario: p.estado };
+  const escribir = leerPermisos(supabase, userId)
+    .then((p) => !!p?.escribir)
+    .catch(() => false);
+
+  const [p, h, e] = await Promise.all([plan, hechos, escribir]);
+  return { semana: construirSemana(p.lista, h.lista, hoy), strava: h.estado, calendario: p.estado, escribir: e };
 }
